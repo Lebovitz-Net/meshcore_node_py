@@ -1,0 +1,655 @@
+---------- $1 ---------
+from .buffer_reader import BufferReader
+from .buffer_writer import BufferWriter
+
+try:
+    from nacl.signing import VerifyKey
+    from nacl.exceptions import BadSignatureError
+    HAS_NACL = True
+except ImportError:
+    HAS_NACL = False
+
+
+class Advert:
+    ADV_TYPE_NONE = 0
+    ADV_TYPE_CHAT = 1
+    ADV_TYPE_REPEATER = 2
+    ADV_TYPE_ROOM = 3
+
+    ADV_LATLON_MASK = 0x10
+    ADV_BATTERY_MASK = 0x20
+    ADV_TEMPERATURE_MASK = 0x40
+    ADV_NAME_MASK = 0x80
+
+    def __init__(self, public_key: bytes, timestamp: int, signature: bytes, app_data: bytes):
+        self.public_key = public_key
+        self.timestamp = timestamp
+        self.signature = signature
+        self.app_data = app_data
+        self.parsed = self.parse_app_data()
+
+    @staticmethod
+    def from_bytes(data: bytes) -> "Advert":
+        br = BufferReader(data)
+        public_key = br.read_bytes(32)
+        timestamp = br.read_uint32_le()
+        signature = br.read_bytes(64)
+        app_data = br.read_remaining_bytes()
+        return Advert(public_key, timestamp, signature, app_data)
+
+    def get_flags(self) -> int:
+        return self.app_data[0]
+
+    def get_type(self) -> int:
+        flags = self.get_flags()
+        return flags & 0x0F
+
+    def get_type_string(self) -> str | None:
+        type_ = self.get_type()
+        if type_ == Advert.ADV_TYPE_NONE:
+            return "NONE"
+        if type_ == Advert.ADV_TYPE_CHAT:
+            return "CHAT"
+        if type_ == Advert.ADV_TYPE_REPEATER:
+            return "REPEATER"
+        if type_ == Advert.ADV_TYPE_ROOM:
+            return "ROOM"
+        return None
+
+    async def is_verified(self) -> bool:
+        """
+        Verify the advert signature using Ed25519.
+        Requires PyNaCl installed.
+        """
+        if not HAS_NACL:
+            raise RuntimeError("PyNaCl is required for signature verification")
+
+        # build signed data
+        bw = BufferWriter()
+        bw.write_bytes(self.public_key)
+        bw.write_uint32_le(self.timestamp)
+        bw.write_bytes(self.app_data)
+        signed_data = bw.to_bytes()
+
+        try:
+            vk = VerifyKey(self.public_key)
+            vk.verify(signed_data, self.signature)
+            return True
+        except BadSignatureError:
+            return False
+
+    def parse_app_data(self) -> dict:
+        br = BufferReader(self.app_data)
+        flags = br.read_byte()
+
+        lat = None
+        lon = None
+        if flags & Advert.ADV_LATLON_MASK:
+            lat = br.read_int32_le()
+            lon = br.read_int32_le()
+
+        name = None
+        if flags & Advert.ADV_NAME_MASK:
+            name = br.read_string()
+
+        return {
+            "type": self.get_type_string(),
+            "lat": lat,
+            "lon": lon,
+            "name": name,
+        }
+---------- $1 ---------
+import struct
+
+class BufferReader:
+    def __init__(self, data: bytes):
+        self.pointer = 0
+        # store as bytes for slicing
+        self.buffer = data if isinstance(data, (bytes, bytearray)) else bytes(data)
+
+    def get_remaining_bytes_count(self) -> int:
+        return len(self.buffer) - self.pointer
+
+    def read_byte(self) -> int:
+        return self.read_bytes(1)[0]
+
+    def read_bytes(self, count: int) -> bytes:
+        data = self.buffer[self.pointer:self.pointer + count]
+        self.pointer += count
+        return data
+
+    def read_remaining_bytes(self) -> bytes:
+        return self.read_bytes(self.get_remaining_bytes_count())
+
+    def read_string(self) -> str:
+        return self.read_remaining_bytes().decode("utf-8", errors="ignore")
+
+    def read_cstring(self, max_length: int) -> str:
+        bytes_ = self.read_bytes(max_length)
+        # stop at first null terminator
+        terminator_index = bytes_.find(b"\x00")
+        if terminator_index != -1:
+            bytes_ = bytes_[:terminator_index]
+        return bytes_.decode("utf-8", errors="ignore")
+
+    def read_int8(self) -> int:
+        return struct.unpack("b", self.read_bytes(1))[0]
+
+    def read_uint8(self) -> int:
+        return struct.unpack("B", self.read_bytes(1))[0]
+
+    def read_uint16_le(self) -> int:
+        return struct.unpack("<H", self.read_bytes(2))[0]
+
+    def read_uint16_be(self) -> int:
+        return struct.unpack(">H", self.read_bytes(2))[0]
+
+    def read_uint32_le(self) -> int:
+        return struct.unpack("<I", self.read_bytes(4))[0]
+
+    def read_uint32_be(self) -> int:
+        return struct.unpack(">I", self.read_bytes(4))[0]
+
+    def read_int16_le(self) -> int:
+        return struct.unpack("<h", self.read_bytes(2))[0]
+
+    def read_int16_be(self) -> int:
+        return struct.unpack(">h", self.read_bytes(2))[0]
+
+    def read_int32_le(self) -> int:
+        return struct.unpack("<i", self.read_bytes(4))[0]
+
+    def read_int24_be(self) -> int:
+        # read 3 bytes big endian
+        b1, b2, b3 = self.read_bytes(3)
+        value = (b1 << 16) | (b2 << 8) | b3
+        # convert to signed 24-bit
+        if value & 0x800000:
+            value -= 0x1000000
+        return value
+---------- $1 ---------
+import base64
+
+class BufferUtils:
+    @staticmethod
+    def bytes_to_hex(data: bytes) -> str:
+        """
+        Convert bytes/bytearray to hex string.
+        """
+        return data.hex()
+
+    @staticmethod
+    def hex_to_bytes(hex_str: str) -> bytes:
+        """
+        Convert hex string to bytes.
+        """
+        return bytes.fromhex(hex_str)
+
+    @staticmethod
+    def base64_to_bytes(b64_str: str) -> bytes:
+        """
+        Convert base64 string to bytes.
+        """
+        return base64.b64decode(b64_str)
+
+    @staticmethod
+    def are_buffers_equal(buf1: bytes, buf2: bytes) -> bool:
+        """
+        Compare two byte sequences for equality.
+        """
+        return buf1 == buf2
+---------- $1 ---------
+---------- $1 ---------
+from .buffer_reader import BufferReader
+
+class CayenneLpp:
+    LPP_DIGITAL_INPUT = 0
+    LPP_DIGITAL_OUTPUT = 1
+    LPP_ANALOG_INPUT = 2
+    LPP_ANALOG_OUTPUT = 3
+    LPP_GENERIC_SENSOR = 100
+    LPP_LUMINOSITY = 101
+    LPP_PRESENCE = 102
+    LPP_TEMPERATURE = 103
+    LPP_RELATIVE_HUMIDITY = 104
+    LPP_ACCELEROMETER = 113
+    LPP_BAROMETRIC_PRESSURE = 115
+    LPP_VOLTAGE = 116
+    LPP_CURRENT = 117
+    LPP_FREQUENCY = 118
+    LPP_PERCENTAGE = 120
+    LPP_ALTITUDE = 121
+    LPP_CONCENTRATION = 125
+    LPP_POWER = 128
+    LPP_DISTANCE = 130
+    LPP_ENERGY = 131
+    LPP_DIRECTION = 132
+    LPP_UNIXTIME = 133
+    LPP_GYROMETER = 134
+    LPP_COLOUR = 135
+    LPP_GPS = 136
+    LPP_SWITCH = 142
+    LPP_POLYLINE = 240
+
+    @staticmethod
+    def parse(data: bytes):
+        buffer = BufferReader(data)
+        telemetry = []
+
+        while buffer.get_remaining_bytes_count() >= 2:
+            channel = buffer.read_uint8()
+            type_ = buffer.read_uint8()
+
+            # stop parsing if channel and type are zero
+            if channel == 0 and type_ == 0:
+                break
+
+            if type_ == CayenneLpp.LPP_GENERIC_SENSOR:
+                value = buffer.read_uint32_be()
+                telemetry.append({"channel": channel, "type": type_, "value": value})
+
+            elif type_ == CayenneLpp.LPP_LUMINOSITY:
+                lux = buffer.read_int16_be()
+                telemetry.append({"channel": channel, "type": type_, "value": lux})
+
+            elif type_ == CayenneLpp.LPP_PRESENCE:
+                presence = buffer.read_uint8()
+                telemetry.append({"channel": channel, "type": type_, "value": presence})
+
+            elif type_ == CayenneLpp.LPP_TEMPERATURE:
+                temperature = buffer.read_int16_be() / 10
+                telemetry.append({"channel": channel, "type": type_, "value": temperature})
+
+            elif type_ == CayenneLpp.LPP_RELATIVE_HUMIDITY:
+                rh = buffer.read_uint8() / 2
+                telemetry.append({"channel": channel, "type": type_, "value": rh})
+
+            elif type_ == CayenneLpp.LPP_BAROMETRIC_PRESSURE:
+                pressure = buffer.read_uint16_be() / 10
+                telemetry.append({"channel": channel, "type": type_, "value": pressure})
+
+            elif type_ == CayenneLpp.LPP_VOLTAGE:
+                voltage = buffer.read_int16_be() / 100
+                telemetry.append({"channel": channel, "type": type_, "value": voltage})
+
+            elif type_ == CayenneLpp.LPP_CURRENT:
+                current = buffer.read_int16_be() / 1000
+                telemetry.append({"channel": channel, "type": type_, "value": current})
+
+            elif type_ == CayenneLpp.LPP_PERCENTAGE:
+                percentage = buffer.read_uint8()
+                telemetry.append({"channel": channel, "type": type_, "value": percentage})
+
+            elif type_ == CayenneLpp.LPP_CONCENTRATION:
+                concentration = buffer.read_uint16_be()
+                telemetry.append({"channel": channel, "type": type_, "value": concentration})
+
+            elif type_ == CayenneLpp.LPP_POWER:
+                power = buffer.read_uint16_be()
+                telemetry.append({"channel": channel, "type": type_, "value": power})
+
+            elif type_ == CayenneLpp.LPP_GPS:
+                latitude = buffer.read_int24_be() / 10000
+                longitude = buffer.read_int24_be() / 10000
+                altitude = buffer.read_int24_be() / 100
+                telemetry.append({
+                    "channel": channel,
+                    "type": type_,
+                    "value": {
+                        "latitude": latitude,
+                        "longitude": longitude,
+                        "altitude": altitude,
+                    },
+                })
+
+            else:
+                # unsupported type, stop parsing further
+                return telemetry
+
+        return telemetry
+---------- $1 ---------
+class Constants:
+    SupportedCompanionProtocolVersion = 1
+
+    class SerialFrameTypes:
+        Incoming = 0x3E  # ">"
+        Outgoing = 0x3C  # "<"
+
+    class Ble:
+        ServiceUuid = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+        CharacteristicUuidRx = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+        CharacteristicUuidTx = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+
+    class CommandCodes:
+        AppStart = 1
+        SendTxtMsg = 2
+        SendChannelTxtMsg = 3
+        GetContacts = 4
+        GetDeviceTime = 5
+        SetDeviceTime = 6
+        SendSelfAdvert = 7
+        SetAdvertName = 8
+        AddUpdateContact = 9
+        SyncNextMessage = 10
+        SetRadioParams = 11
+        SetTxPower = 12
+        ResetPath = 13
+        SetAdvertLatLon = 14
+        RemoveContact = 15
+        ShareContact = 16
+        ExportContact = 17
+        ImportContact = 18
+        Reboot = 19
+        GetBatteryVoltage = 20
+        SetTuningParams = 21  # todo
+        DeviceQuery = 22
+        ExportPrivateKey = 23
+        ImportPrivateKey = 24
+        SendRawData = 25
+        SendLogin = 26  # todo
+        SendStatusReq = 27  # todo
+        GetChannel = 31
+        SetChannel = 32
+        SignStart = 33
+        SignData = 34
+        SignFinish = 35
+        SendTracePath = 36
+        SetOtherParams = 38
+        SendTelemetryReq = 39
+        SendBinaryReq = 50
+
+    class ResponseCodes:
+        Ok = 0
+        Err = 1
+        ContactsStart = 2
+        Contact = 3
+        EndOfContacts = 4
+        SelfInfo = 5
+        Sent = 6
+        ContactMsgRecv = 7
+        ChannelMsgRecv = 8
+        CurrTime = 9
+        NoMoreMessages = 10
+        ExportContact = 11
+        BatteryVoltage = 12
+        DeviceInfo = 13
+        PrivateKey = 14
+        Disabled = 15
+        ChannelInfo = 18
+        SignStart = 19
+        Signature = 20
+
+    class PushCodes:
+        Advert = 0x80
+        PathUpdated = 0x81
+        SendConfirmed = 0x82
+        MsgWaiting = 0x83
+        RawData = 0x84
+        LoginSuccess = 0x85
+        LoginFail = 0x86
+        StatusResponse = 0x87
+        LogRxData = 0x88
+        TraceData = 0x89
+        NewAdvert = 0x8A
+        TelemetryResponse = 0x8B
+        BinaryResponse = 0x8C
+
+    class ErrorCodes:
+        UnsupportedCmd = 1
+        NotFound = 2
+        TableFull = 3
+        BadState = 4
+        FileIoError = 5
+        IllegalArg = 6
+
+    class AdvType:
+        None = 0
+        Chat = 1
+        Repeater = 2
+        Room = 3
+
+    class SelfAdvertTypes:
+        ZeroHop = 0
+        Flood = 1
+
+    class TxtTypes:
+        Plain = 0
+        CliData = 1
+        SignedPlain = 2
+
+    class BinaryRequestTypes:
+        GetTelemetryData = 0x03
+        GetAvgMinMax = 0x04
+        GetAccessList = 0x05
+        GetNeighbours = 0x06
+---------- $1 ---------
+import asyncio
+from collections import defaultdict
+
+class EventEmitter:
+    def __init__(self):
+        self._event_listeners = defaultdict(list)
+
+    def on(self, event: str, callback):
+        """Register a persistent listener for an event."""
+        self._event_listeners[event].append(callback)
+
+    def off(self, event: str, callback):
+        """Remove a specific listener for an event."""
+        if event in self._event_listeners:
+            self._event_listeners[event] = [
+                cb for cb in self._event_listeners[event] if cb != callback
+            ]
+
+    def once(self, event: str, callback):
+        """Register a one-time listener for an event."""
+
+        def internal_callback(*args, **kwargs):
+            self.off(event, internal_callback)
+            loop = asyncio.get_event_loop()
+            loop.call_soon(callback, *args, **kwargs)
+
+        self.on(event, internal_callback)
+
+    def emit(self, event: str, *args, **kwargs):
+        """Trigger all listeners for an event asynchronously."""
+        if event in self._event_listeners:
+            loop = asyncio.get_event_loop()
+            for listener in list(self._event_listeners[event]):
+                loop.call_soon(listener, *args, **kwargs)
+---------- $1 ---------
+# __init__.py
+
+from .connection.connection import Connection
+from .connection.web_ble_connection import WebBleConnection
+from .connection.serial_connection import SerialConnection
+from .connection.nodejs_serial_connection import NodeJSSerialConnection
+from .connection.web_serial_connection import WebSerialConnection
+from .connection.tcp_connection import TCPConnection
+from .connection.sx1262_connection import SX1262Connection
+from .constants import Constants
+from .advert import Advert
+from .packet import Packet
+from .buffer_utils import BufferUtils
+from .cayenne_lpp import CayenneLpp
+
+__all__ = [
+    "Connection",
+    "WebBleConnection",
+    "SerialConnection",
+    "NodeJSSerialConnection",
+    "WebSerialConnection",
+    "TCPConnection",
+    "SX1262Connection",
+    "Constants",
+    "Advert",
+    "Packet",
+    "BufferUtils",
+    "CayenneLpp",
+]
+---------- $1 ---------
+from .buffer_reader import BufferReader
+from .advert import Advert
+
+class Packet:
+    # Packet::header values
+    PH_ROUTE_MASK = 0x03   # 2-bits
+    PH_TYPE_SHIFT = 2
+    PH_TYPE_MASK = 0x0F    # 4-bits
+    PH_VER_SHIFT = 6
+    PH_VER_MASK = 0x03     # 2-bits
+
+    ROUTE_TYPE_RESERVED1 = 0x00
+    ROUTE_TYPE_FLOOD = 0x01
+    ROUTE_TYPE_DIRECT = 0x02
+    ROUTE_TYPE_RESERVED2 = 0x03
+
+    PAYLOAD_TYPE_REQ = 0x00
+    PAYLOAD_TYPE_RESPONSE = 0x01
+    PAYLOAD_TYPE_TXT_MSG = 0x02
+    PAYLOAD_TYPE_ACK = 0x03
+    PAYLOAD_TYPE_ADVERT = 0x04
+    PAYLOAD_TYPE_GRP_TXT = 0x05
+    PAYLOAD_TYPE_GRP_DATA = 0x06
+    PAYLOAD_TYPE_ANON_REQ = 0x07
+    PAYLOAD_TYPE_PATH = 0x08
+    PAYLOAD_TYPE_TRACE = 0x09
+    PAYLOAD_TYPE_RAW_CUSTOM = 0x0F
+
+    def __init__(self, header: int, path: bytes, payload: bytes):
+        self.header = header
+        self.path = path
+        self.payload = payload
+
+        # parsed info
+        self.route_type = self.get_route_type()
+        self.route_type_string = self.get_route_type_string()
+        self.payload_type = self.get_payload_type()
+        self.payload_type_string = self.get_payload_type_string()
+        self.payload_version = self.get_payload_ver()
+        self.is_marked_do_not_retransmit = self.is_marked_do_not_retransmit()
+
+    @staticmethod
+    def from_bytes(data: bytes) -> "Packet":
+        buffer_reader = BufferReader(data)
+        header = buffer_reader.read_byte()
+        path_len = buffer_reader.read_int8()
+        path = buffer_reader.read_bytes(path_len)
+        payload = buffer_reader.read_remaining_bytes()
+        return Packet(header, path, payload)
+
+    def get_route_type(self) -> int:
+        return self.header & Packet.PH_ROUTE_MASK
+
+    def get_route_type_string(self) -> str | None:
+        rt = self.get_route_type()
+        if rt == Packet.ROUTE_TYPE_FLOOD:
+            return "FLOOD"
+        elif rt == Packet.ROUTE_TYPE_DIRECT:
+            return "DIRECT"
+        return None
+
+    def is_route_flood(self) -> bool:
+        return self.get_route_type() == Packet.ROUTE_TYPE_FLOOD
+
+    def is_route_direct(self) -> bool:
+        return self.get_route_type() == Packet.ROUTE_TYPE_DIRECT
+
+    def get_payload_type(self) -> int:
+        return (self.header >> Packet.PH_TYPE_SHIFT) & Packet.PH_TYPE_MASK
+
+    def get_payload_type_string(self) -> str | None:
+        pt = self.get_payload_type()
+        return {
+            Packet.PAYLOAD_TYPE_REQ: "REQ",
+            Packet.PAYLOAD_TYPE_RESPONSE: "RESPONSE",
+            Packet.PAYLOAD_TYPE_TXT_MSG: "TXT_MSG",
+            Packet.PAYLOAD_TYPE_ACK: "ACK",
+            Packet.PAYLOAD_TYPE_ADVERT: "ADVERT",
+            Packet.PAYLOAD_TYPE_GRP_TXT: "GRP_TXT",
+            Packet.PAYLOAD_TYPE_GRP_DATA: "GRP_DATA",
+            Packet.PAYLOAD_TYPE_ANON_REQ: "ANON_REQ",
+            Packet.PAYLOAD_TYPE_PATH: "PATH",
+            Packet.PAYLOAD_TYPE_TRACE: "TRACE",
+            Packet.PAYLOAD_TYPE_RAW_CUSTOM: "RAW_CUSTOM",
+        }.get(pt, None)
+
+    def get_payload_ver(self) -> int:
+        return (self.header >> Packet.PH_VER_SHIFT) & Packet.PH_VER_MASK
+
+    def mark_do_not_retransmit(self):
+        self.header = 0xFF
+
+    def is_marked_do_not_retransmit(self) -> bool:
+        return self.header == 0xFF
+
+    def parse_payload(self):
+        pt = self.get_payload_type()
+        if pt == Packet.PAYLOAD_TYPE_PATH:
+            return self.parse_payload_type_path()
+        elif pt == Packet.PAYLOAD_TYPE_REQ:
+            return self.parse_payload_type_req()
+        elif pt == Packet.PAYLOAD_TYPE_RESPONSE:
+            return self.parse_payload_type_response()
+        elif pt == Packet.PAYLOAD_TYPE_TXT_MSG:
+            return self.parse_payload_type_txt_msg()
+        elif pt == Packet.PAYLOAD_TYPE_ACK:
+            return self.parse_payload_type_ack()
+        elif pt == Packet.PAYLOAD_TYPE_ADVERT:
+            return self.parse_payload_type_advert()
+        elif pt == Packet.PAYLOAD_TYPE_ANON_REQ:
+            return self.parse_payload_type_anon_req()
+        return None
+
+    def parse_payload_type_path(self):
+        br = BufferReader(self.payload)
+        dest = br.read_byte()
+        src = br.read_byte()
+        return {"src": src, "dest": dest}
+
+    def parse_payload_type_req(self):
+        br = BufferReader(self.payload)
+        dest = br.read_byte()
+        src = br.read_byte()
+        encrypted = br.read_remaining_bytes()
+        return {"src": src, "dest": dest, "encrypted": encrypted}
+
+    def parse_payload_type_response(self):
+        br = BufferReader(self.payload)
+        dest = br.read_byte()
+        src = br.read_byte()
+        return {"src": src, "dest": dest}
+
+    def parse_payload_type_txt_msg(self):
+        br = BufferReader(self.payload)
+        dest = br.read_byte()
+        src = br.read_byte()
+        return {"src": src, "dest": dest}
+
+    def parse_payload_type_ack(self):
+        return {"ack_code": self.payload}
+
+    def parse_payload_type_advert(self):
+        advert = Advert.from_bytes(self.payload)
+        return {
+            "public_key": advert.public_key,
+            "timestamp": advert.timestamp,
+            "app_data": advert.parse_app_data(),
+        }
+
+    def parse_payload_type_anon_req(self):
+        br = BufferReader(self.payload)
+        dest = br.read_byte()
+        src_public_key = br.read_bytes(32)
+        return {"src": src_public_key, "dest": dest}
+---------- $1 ---------
+import random
+
+class RandomUtils:
+    @staticmethod
+    def get_random_int(min_val: int, max_val: int) -> int:
+        """
+        Return a random integer between min_val and max_val inclusive.
+        Equivalent to JS Math.floor(Math.random() * (max - min + 1)) + min.
+        """
+        return random.randint(min_val, max_val)
