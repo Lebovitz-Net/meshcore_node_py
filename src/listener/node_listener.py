@@ -7,11 +7,12 @@ from constants import Constants
 from events import EventEmitter
 
 
+
 # section 1
 
 class NodeTransport(EventEmitter):
     """
-    Minimal transport interface expected by NodeListener.
+    Minimal transport interface expected by NodeListener.git 
     Subclass this for SX1262, TCP, etc. Must implement send(), receive(), close().
     """
 
