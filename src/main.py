@@ -2,7 +2,7 @@ import asyncio
 from meshcore import MeshCore
 
 async def main():
-    core = MeshCore()
+    core = await MeshCore.create_serial("/dev/ttyUSB0")
 
     # Subscribe to packet events
     def on_packet(packet):
@@ -32,4 +32,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
