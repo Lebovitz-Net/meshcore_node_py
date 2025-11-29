@@ -1,9 +1,11 @@
 import asyncio
 import time
-from meshcore.buffer.buffer_writer import BufferWriter
-from meshcore.buffer.buffer_reader import BufferReader
-from meshcore.constants import Constants
-from meshcore.events import EventEmitter
+
+from buffer_writer import BufferWriter
+from buffer_reader import BufferReader
+from constants import Constants
+from events import EventEmitter
+
 
 # section 1
 
@@ -237,7 +239,7 @@ class NodeListener(EventEmitter):
         writer.write_uint8(Constants.ResponseCodes.EndOfContacts)
         await self.transport.send(writer.to_bytes())
 
-# setion 4
+# section 4
 
     # -------------------------
     # Command handlers (Part 2)
@@ -461,3 +463,61 @@ class NodeListener(EventEmitter):
         path = reader.read_remaining_bytes()
         # For now we just acknowledge; later you could log or process the path
         await self.send_ok_response()
+
+    async def handle_set_other_params(self, reader: BufferReader):
+        """Handle SetOtherParams command: acknowledge with OK."""
+        _manual_add_contacts = reader.read_uint8()
+        await self.send_ok_response()
+
+# section 5
+
+    # -------------------------
+    # Push events (server-initiated)
+    # -------------------------
+
+    async def push_msg_waiting(self):
+        """Push a MsgWaiting event to notify client of pending messages."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.MsgWaiting)
+        await self.transport.send(writer.to_bytes())
+
+    async def push_advert(self, public_key: bytes):
+        """Push an Advert event with a public key."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.Advert)
+        writer.write_bytes(public_key)
+        await self.transport.send(writer.to_bytes())
+
+    async def push_send_confirmed(self, ack_crc: int = 0):
+        """Push a SendConfirmed event with optional ack CRC."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.SendConfirmed)
+        writer.write_uint32_le(ack_crc)
+        await self.transport.send(writer.to_bytes())
+
+    async def push_status_response(self, public_key: bytes, status: str = "OK"):
+        """Push a StatusResponse event with a public key and status string."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.StatusResponse)
+        writer.write_uint8(0)  # reserved
+        writer.write_bytes(public_key[:6])
+        writer.write_string(status)
+        await self.transport.send(writer.to_bytes())
+
+    async def push_telemetry_response(self, public_key: bytes, cayenne_payload: bytes):
+        """Push a TelemetryResponse event with CayenneLPP payload."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.TelemetryResponse)
+        writer.write_uint8(0)  # reserved
+        writer.write_bytes(public_key[:6])
+        writer.write_bytes(cayenne_payload)
+        await self.transport.send(writer.to_bytes())
+
+    async def push_binary_response(self, tag: int, payload: bytes):
+        """Push a BinaryResponse event with tag and payload."""
+        writer = BufferWriter()
+        writer.write_uint8(Constants.PushCodes.BinaryResponse)
+        writer.write_uint8(0)        # reserved
+        writer.write_uint32_le(tag)
+        writer.write_bytes(payload)
+        await self.transport.send(writer.to_bytes())
