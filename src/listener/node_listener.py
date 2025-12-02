@@ -104,6 +104,8 @@ class NodeListener(EventEmitter):
             Constants.CommandCodes.SetOtherParams: self.handle_set_other_params,
         }
 
+        print("[node_listener] on_frame_received: got cmd ${cmd}")
+
         handler = handlers.get(cmd)
         if handler:
             await handler(reader)
