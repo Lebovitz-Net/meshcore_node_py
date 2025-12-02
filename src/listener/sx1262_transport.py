@@ -1,7 +1,7 @@
 # src/transport/sx1262_transport.py
 import asyncio
 from sx1262.sx1262 import SX1262
-from src.listener.serial_transport import SerialTransport
+from listener.serial_transport import SerialTransport
 
 class SX1262Transport(SerialTransport):
     """

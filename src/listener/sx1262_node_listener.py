@@ -1,6 +1,6 @@
 import asyncio
-from src.listener.node_listener import NodeListener
-from src.listener.sx1262_transport import SX1262Transport
+from listener.node_listener import NodeListener
+from listener.sx1262_transport import SX1262Transport
 
 class SX1262NodeListener(NodeListener):
     def __init__(self, port="/dev/ttyS0", baudrate=9600,

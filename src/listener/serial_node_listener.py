@@ -1,6 +1,6 @@
 # serial_node_listener.py
-from src.listener.node_listener import NodeListener
-from src.listener.serial_transport import SerialTransport
+from listener.node_listener import NodeListener
+from listener.serial_transport import SerialTransport
 
 class SerialNodeListener(NodeListener):
     def __init__(self, port="/dev/ttyS0", baudrate=9600,

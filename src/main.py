@@ -1,7 +1,7 @@
 # main.py
 import asyncio
 import argparse
-from src.node_manager import NodeManager
+from node_manager import NodeManager
 
 
 async def main():

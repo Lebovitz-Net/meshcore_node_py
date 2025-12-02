@@ -93,7 +93,7 @@ class Constants:
         IllegalArg = 6
 
     class AdvType:
-        None = 0
+        AdvType_None = 0
         Chat = 1
         Repeater = 2
         Room = 3

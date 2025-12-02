@@ -1,7 +1,7 @@
 # serial_transport.py
 import asyncio
 import serial_asyncio
-from src.listener.node_listener import NodeTransport
+from listener.node_listener import NodeTransport
 
 class SerialTransport(NodeTransport):
     def __init__(self, port="/dev/ttyS0", baudrate=9600):

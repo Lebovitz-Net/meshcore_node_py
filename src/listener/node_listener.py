@@ -7,11 +7,11 @@ from buffer.buffer_reader import BufferReader
 from constants import Constants
 from events import EventEmitter
 from store.contact_store import ContactStore
-from src.store.message_store import MessageStore
-from src.advert import Advert
+from store.message_store import MessageStore
+from advert import Advert
 
 class NodeListener(EventEmitter):
-    def __init__(self, transport: NodeTransport, contact_store=None, message_store=None):
+    def __init__(self, transport: NodeTransport, contact_store=None, message_store=None, can_route=True):
         super().__init__()
         self.transport = transport
         self.contact_store = contact_store or ContactStore()

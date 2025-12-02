@@ -4,7 +4,7 @@ Handler maps for MeshCore protocol commands.
 Defines groups of handlers that can be composed into role-specific maps.
 """
 
-from src.constants import Constants
+from constants import Constants
 
 # -------------------------
 # Handler Groups
