@@ -1,0 +1,64 @@
+# src/node_manager.py
+import asyncio
+from src.listener.tcp_node_listener import TCPNodeListener
+from src.listener.sx1262_node_listener import SX1262NodeListener
+from src.store.contact_store import ContactStore
+from src.store.message_store import MessageStore
+
+
+class NodeManager:
+    def __init__(self,
+                 role: str = "router",
+                 tcp_port: int = 9000,
+                 sx1262_port: str = "/dev/ttyS0",
+                 sx1262_baud: int = 9600):
+        """
+        NodeManager orchestrates listeners based on role:
+        - companion: Companion Radio (TCP + SX1262, TCP cannot route)
+        - router: Router (TCP + SX1262, mesh side routes packets)
+        """
+        self.role = role
+        self.contact_store = ContactStore()
+        self.message_store = MessageStore()
+
+        self._listeners = []
+
+        if role in ("companion", "router"):
+            self.tcp_listener = TCPNodeListener(
+                port=tcp_port,
+                contact_store=self.contact_store,
+                message_store=self.message_store,
+                # TCP never routes, regardless of role
+                can_route=False
+            )
+            self._listeners.append(self.tcp_listener)
+
+        self.sx1262_listener = SX1262NodeListener(
+            port=sx1262_port,
+            baudrate=sx1262_baud,
+            contact_store=self.contact_store,
+            message_store=self.message_store
+        )
+        self._listeners.append(self.sx1262_listener)
+
+    async def start(self):
+        """Start all listeners."""
+        tasks = [listener.start() for listener in self._listeners]
+        await asyncio.gather(*tasks)
+        print(f"NodeManager started in {self.role} mode")
+
+    async def stop(self):
+        """Stop all listeners."""
+        tasks = [listener.stop() for listener in self._listeners]
+        await asyncio.gather(*tasks)
+        print("NodeManager stopped")
+
+    async def broadcast_msg_waiting(self):
+        """Push MsgWaiting event across all listeners."""
+        tasks = [listener.push_msg_waiting() for listener in self._listeners]
+        await asyncio.gather(*tasks)
+
+    async def broadcast_advert(self, public_key: bytes):
+        """Push Advert event across all listeners."""
+        tasks = [listener.push_advert(public_key) for listener in self._listeners]
+        await asyncio.gather(*tasks)

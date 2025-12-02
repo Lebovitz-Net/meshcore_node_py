@@ -1,34 +1,43 @@
+# main.py
 import asyncio
-from meshcore import MeshCore
+import argparse
+from src.node_manager import NodeManager
+
 
 async def main():
-    core = await MeshCore.create_serial("/dev/ttyUSB0")
+    parser = argparse.ArgumentParser(description="Start a MeshCore node")
+    parser.add_argument(
+        "--role",
+        choices=["companion", "router"],
+        default="router",
+        help="Role of the node: companion (Companion Radio: TCP + SX1262, TCP cannot route) "
+             "or router (Router: TCP + SX1262, mesh side routes packets)"
+    )
+    parser.add_argument("--tcp-port", type=int, default=9000,
+                        help="TCP port for companion/router")
+    parser.add_argument("--sx1262-port", type=str, default="/dev/ttyS0",
+                        help="Serial port for SX1262")
+    parser.add_argument("--sx1262-baud", type=int, default=9600,
+                        help="Baudrate for SX1262")
+    args = parser.parse_args()
 
-    # Subscribe to packet events
-    def on_packet(packet):
-        print("Received packet:", packet)
+    manager = NodeManager(
+        role=args.role,
+        tcp_port=args.tcp_port,
+        sx1262_port=args.sx1262_port,
+        sx1262_baud=args.sx1262_baud
+    )
 
-    core.on("packet", on_packet)
-    core.on("error", lambda e: print("Error:", e))
-
-    # Start MeshCore
-    await core.start()
-
-    # Send a flood advert
-    await core.commands.send_self_advert(advert_type=1)
-
-    # Query contacts
-    contacts = await core.commands.get_contacts()
-    print("Contacts:", contacts)
-
-    # Keep running until Ctrl-C
     try:
-        while True:
-            await asyncio.sleep(1)
-    except KeyboardInterrupt:
-        print("Stopping MeshCore...")
+        await manager.start()
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await manager.stop()
 
-    await core.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Shutting down node...")

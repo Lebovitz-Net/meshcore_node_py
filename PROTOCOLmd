@@ -1,0 +1,70 @@
+# MeshCore Protocol Specification
+
+| Command / Push                 | Transport Scope | Direction (Node ↔ Peer) | Purpose |
+|--------------------------------|-----------------|--------------------------|---------|
+| **Message Commands**           |                 |                          |         |
+| SendTxtMsg / SendChannelTxtMsg | TCP only        | Client → Node → LoRa     | Inject text message into mesh |
+| SyncNextMessage                | Both            | Peer/Client → Node       | Retrieve next pending message |
+| MsgAck                         | LoRa only       | Peer → Node              | Acknowledge received message |
+| MsgWaiting (push)              | Both            | Node → Peer/Client       | Notify of pending messages |
+| ContactMsgRecv / ChannelMsgRecv | Both          | Node → Peer/Client       | Deliver received message |
+| NoMoreMessages                 | Both            | Node → Peer/Client       | Signal no more messages |
+
+| **Contact Management**         |                 |                          |         |
+| GetContacts                    | TCP only        | Client → Node            | Query contact list |
+| SyncContact / ContactAck       | LoRa only       | Peer ↔ Node              | Synchronize contacts across mesh |
+| AddUpdateContact               | TCP only        | Client → Node            | Add or update contact entry |
+| RemoveContact                  | TCP only        | Client → Node            | Remove contact entry |
+| ShareContact / ExportContact   | TCP only        | Client → Node            | Export/share contact |
+| ImportContact                  | TCP only        | Client → Node            | Import contact advert |
+
+| **Presence / Advertisements**  |                 |                          |         |
+| SelfAdvert                     | Both            | Node → Peer/Client       | Advertise node presence |
+| FloodAdvert (SelfAdvert+flood) | Both            | Client → Node → LoRa 
+| SetAdvertName                  | TCP only        | Client → Node            | Set advertised name |
+| SetAdvertLatLon                | TCP only        | Client → Node            | Set advertised location |
+
+| **Device / Radio Control**     |                 |                          |         |
+| DeviceInfo (response)          | TCP only        | Node → Client            | Report firmware/hardware info |
+| SelfInfo (response)            | TCP only        | Node → Client            | Report node identity and radio params |
+| GetDeviceTime / SetDeviceTime  | TCP only        | Client ↔ Node            | Query or set device time |
+| SetRadioParams                 | TCP only        | Client → Node            | Configure frequency, bandwidth, SF, CR |
+| SetTxPower                     | TCP only        | Client → Node            | Configure transmit power |
+| GetChannel / SetChannel        | TCP only        | Client ↔ Node            | Query or configure channel info |
+| ResetPath / SendTracePath      | LoRa only       | Peer ↔ Node              | Reset or trace routing path |
+| PathUpdated (push)             | LoRa only       | Node → Peer              | Notify path update |
+
+| **System / Security**          |                 |                          |         |
+| Reboot                         | TCP only        | Client → Node            | Reboot device |
+| DeviceQuery                    | TCP only        | Client → Node            | Query supported protocol version |
+| ExportPrivateKey / ImportPrivateKey | TCP only   | Client ↔ Node            | Manage private key |
+| SignStart / SignData / SignFinish | TCP only     | Client ↔ Node            | Perform signing operation |
+| SendLogin                      | TCP only        | Client → Node            | Authenticate client |
+| SendStatusReq / StatusResponse | TCP only        | Client ↔ Node            | Request/receive status |
+| SendTelemetryReq / TelemetryResponse | TCP only  | Client ↔ Node            | Request/receive telemetry |
+| SendBinaryReq / BinaryResponse | TCP only        | Client ↔ Node            | Request/receive binary data |
+| SendRawData / RawData          | TCP only        | Client ↔ Node            | Exchange raw payloads |
+| LogRxData (push)               | TCP only        | Node → Client            | Log received raw data |
+  
+| **Miscellaneous Pushes**       |                 |                          |         |
+| Advert (push)                  | LoRa only       | Node → Peer              | Advert packet |
+| NewAdvert (push)               | LoRa only       | Node → Peer              | New advert contact |
+| SendConfirmed (push)           | Both            | Node → Peer/Client       | Confirm message delivery |
+| TraceData (push)               | LoRa only       | Node → Peer              | Trace path data |
+| LoginSuccess (push)            | TCP only        | Node → Client            | Confirm login success |
+
+---
+
+## Transport Roles
+
+- **LoRa (mesh data plane)**  
+  - Peer‑to‑peer traffic: contacts, messages, adverts, flood, path reset/trace.  
+  - Used for mesh synchronization and presence propagation.
+
+- **TCP (management/control plane)**  
+  - Companion app or operator console: send messages, query contacts, device info, radio params, telemetry, security.  
+  - Used for node management and user interaction.
+
+- **Shared (both)**  
+  - Contacts/messages/presence state (`MsgWaiting`, `SyncNextMessage`, `GetContacts`, `SelfAdvert`).  
+  - Ensures consistency between mesh peers and TCP clients.
