@@ -60,9 +60,4 @@ class SX1262:
         """
         if self.ser and self.ser.is_open:
             self.ser.close()
-        for pin in [self.reset_pin, self.busy_pin, self.m0_pin, self.m1_pin]:
-            try:
-                GPIO.cleanup(pin)
-            except RuntimeError:
-                # Ignore if pin was already cleaned up
-                pass
+        GPIO.cleanup()  # resets all pins you’ve touched
