@@ -18,7 +18,7 @@ class SX1262:
         self.busy_pin = busy_pin
         self.m0_pin = m0_pin
         self.m1_pin = m1_pin
-        print(f"[SX1262] Setting up GPIO pins {self.reset_pin}")
+        # print(f"[SX1262] Setting up GPIO pins {self.reset_pin}")
         # Setup GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.reset_pin, GPIO.OUT)
