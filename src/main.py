@@ -1,4 +1,3 @@
-# main.py
 import asyncio
 import argparse
 from node_manager import NodeManager
@@ -30,6 +29,8 @@ async def main():
 
     try:
         await manager.start()
+        # Keep running until cancelled (Ctrl+C)
+        await asyncio.Event().wait()
     except asyncio.CancelledError:
         pass
     finally:
