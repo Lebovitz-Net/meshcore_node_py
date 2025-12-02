@@ -357,11 +357,15 @@ class NodeListener(EventEmitter):
         await self.send_ok_response()
 
     async def handle_set_radio_params(self, reader: BufferReader):
-        """Handle SetRadioParams command: acknowledge with OK."""
-        _freq = reader.read_uint32_le()
-        _bw = reader.read_uint32_le()
-        _sf = reader.read_uint8()
-        _cr = reader.read_uint8()
+        """Handle SetRadioParams command: acknowledge with OK and forward to radio transport if present."""
+        freq = reader.read_uint32_le()
+        bw   = reader.read_uint32_le()
+        sf   = reader.read_uint8()
+        cr   = reader.read_uint8()
+
+        if hasattr(self.transport, "set_radio_params"):
+            self.transport.set_radio_params(freq, bw, sf, cr)
+
         await self.send_ok_response()
 
     async def handle_set_tx_power(self, reader: BufferReader):

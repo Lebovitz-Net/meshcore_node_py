@@ -63,3 +63,18 @@ class SX1262:
         if GPIO.getmode() is not None:
             GPIO.cleanup()
 
+    def encode_freq(self, frequency_hz: float) -> bytes:
+        # Datasheet-specific encoding
+        freq_val = int(frequency_hz / 1e3)
+        return freq_val.to_bytes(3, "little")
+
+    def encode_bw(self, bandwidth_hz: float) -> bytes:
+        bw_map = {62500: b"\x01", 125000: b"\x02", 250000: b"\x03"}
+        return bw_map.get(int(bandwidth_hz), b"\x00")
+
+    def encode_sf(self, sf: int) -> bytes:
+        return bytes([sf])
+
+    def encode_cr(self, cr: str) -> bytes:
+        cr_map = {"4/5": b"\x01", "4/6": b"\x02", "4/7": b"\x03", "4/8": b"\x04"}
+        return cr_map.get(cr, b"\x00")

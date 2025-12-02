@@ -41,3 +41,16 @@ class SX1262Transport(SerialTransport):
             if data:
                 await self._queue.put(data)
             await asyncio.sleep(0.1)
+
+    def set_radio_params(self, frequency, bandwidth, spreading_factor, coding_rate):
+        """
+        High-level API: configure the radio with given parameters.
+        """
+        # Delegate to driver primitives
+        frame = (
+            self.radio.encode_freq(frequency) +
+            self.radio.encode_bw(bandwidth) +
+            self.radio.encode_sf(spreading_factor) +
+            self.radio.encode_cr(coding_rate)
+        )
+        self.radio.send_config_frame(frame)

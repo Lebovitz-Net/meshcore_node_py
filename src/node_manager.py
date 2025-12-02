@@ -45,6 +45,17 @@ class NodeManager:
         """Start all listeners."""
         tasks = [listener.start() for listener in self._listeners]
         await asyncio.gather(*tasks)
+        # General radio discovery
+        for listener in self._listeners:
+            transport = getattr(listener, "transport", None)
+            if transport and hasattr(transport, "set_radio_params"):
+                transport.set_radio_params(
+                    frequency=910_525_000,
+                    bandwidth=62_500,
+                    spreading_factor=7,
+                    coding_rate="4/5"
+                )
+
         print(f"NodeManager started in {self.role} mode")
 
     async def stop(self):
