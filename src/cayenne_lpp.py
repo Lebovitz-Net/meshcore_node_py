@@ -1,4 +1,4 @@
-from .buffer_reader import BufferReader
+from buffer.buffer_reader import BufferReader
 
 class CayenneLpp:
     LPP_DIGITAL_INPUT = 0

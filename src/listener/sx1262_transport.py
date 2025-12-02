@@ -1,32 +1,36 @@
 # src/transport/sx1262_transport.py
 import asyncio
 from sx1262.sx1262 import SX1262
+from src.listener.serial_transport import SerialTransport
 
-class SX1262Transport:
+class SX1262Transport(SerialTransport):
     """
     Async transport adapter for SX1262 LoRa HAT.
-    Wraps the low-level driver and exposes send/receive for NodeListener.
+    Matches NodeTransport interface: open, close, send, receive.
     """
 
-    def __init__(self, serial_port="/dev/ttyS0", baudrate=9600):
-        self.radio = SX1262(serial_port=serial_port, baudrate=baudrate)
+    def __init__(self, port="/dev/ttyS0", baudrate=9600):
+        super().__init__()
+        self.radio = SX1262(serial_port=port, baudrate=baudrate)
         self._queue = asyncio.Queue()
         self._running = False
         self._task = None
 
-    async def start(self):
+    async def open(self):
         self._running = True
         self._task = asyncio.create_task(self._poll_radio())
+        self.emit("listening")
 
-    async def stop(self):
+    async def close(self):
         self._running = False
         if self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
         self.radio.shutdown()
+        self.emit("stopped")
 
-    async def send(self, packet: bytes):
-        self.radio.send(packet)
+    async def send(self, data: bytes):
+        self.radio.send(data)
 
     async def receive(self) -> bytes:
         return await self._queue.get()

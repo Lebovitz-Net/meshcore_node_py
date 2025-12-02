@@ -1,5 +1,5 @@
-from .buffer_reader import BufferReader
-from .buffer_writer import BufferWriter
+from buffer.buffer_reader import BufferReader
+from buffer.buffer_writer import BufferWriter
 
 try:
     from nacl.signing import VerifyKey
