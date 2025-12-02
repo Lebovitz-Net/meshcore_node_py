@@ -5,10 +5,11 @@ from listener.sx1262_transport import SX1262Transport
 class SX1262NodeListener(NodeListener):
     def __init__(self, port="/dev/ttyS0", baudrate=9600,
                  contact_store=None, message_store=None):
-        super().__init__(contact_store=contact_store,
+        self.transport = SX1262Transport(port=port, baudrate=baudrate)
+        super().__init__(self.transport, 
+                         contact_store=contact_store,
                          message_store=message_store)
         # Transport matches NodeTransport interface
-        self.transport = SX1262Transport(port=port, baudrate=baudrate)
         self._task = None
 
     async def start(self):
