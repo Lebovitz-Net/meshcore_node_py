@@ -53,4 +53,4 @@ class SX1262Transport(SerialTransport):
             self.radio.encode_sf(spreading_factor) +
             self.radio.encode_cr(coding_rate)
         )
-        self.radio.send_config_frame(frame)
+        self.radio.send(frame)
