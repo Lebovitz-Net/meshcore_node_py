@@ -1,4 +1,4 @@
-from .buffer_reader import BufferReader
+from buffer.buffer_reader import BufferReader
 from .advert import Advert
 
 class Packet:
