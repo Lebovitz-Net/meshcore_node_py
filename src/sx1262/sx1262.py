@@ -54,12 +54,12 @@ class SX1262:
             return self.ser.read(self.ser.in_waiting)
         return b""
 
-def shutdown(self):
-    """
-    Clean up GPIO and close serial.
-    """
-    if self.ser and self.ser.is_open:
-        self.ser.close()
-    if GPIO.getmode() is not None:
-        GPIO.cleanup()
+    def shutdown(self):
+        """
+        Clean up GPIO and close serial.
+        """
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+        if GPIO.getmode() is not None:
+            GPIO.cleanup()
 
