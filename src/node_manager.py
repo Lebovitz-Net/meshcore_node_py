@@ -34,10 +34,10 @@ class NodeManager:
             self._listeners.append(self.tcp_listener)
 
         self.sx1262_listener = SX1262NodeListener(
-            port=sx1262_port,
-            baudrate=sx1262_baud,
-            contact_store=self.contact_store,
-            message_store=self.message_store
+            sx1262_port,
+            sx1262_baud,
+            self.contact_store,
+            self.message_store
         )
         self._listeners.append(self.sx1262_listener)
 
