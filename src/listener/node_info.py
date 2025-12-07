@@ -4,8 +4,8 @@ from buffer.buffer_writer import BufferWriter
 from constants import Constants
 
 class NodeInfo:
-    def __init__(self, transport):
-        self.transport = transport
+    def __init__(self, foo, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     # Responses
     async def send_ok_response(self):

@@ -14,13 +14,10 @@ class NodeListener(EventEmitter,
                    NodeMetrics,
                    NodeInfo,
                    NodePush):
-    def __init__(self, contact_store, message_store):
-        EventEmitter.__init__(self)
-        NodeMessages.__init__(contact_store, message_store)
-        NodeDiagnostics.__init__()
-        NodeMetrics.__init__()
-        NodeInfo.__init__()
-        NodePush.__init__(message_store)
+    def __init__(self, contact_store, message_store, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.contact_store = contact_store
+        self.message_store = message_store
 
     async def on_frame_received(self, frame_bytes: bytes):
         reader = BufferReader(frame_bytes)

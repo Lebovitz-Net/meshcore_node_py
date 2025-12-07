@@ -2,9 +2,8 @@ from buffer.buffer_writer import BufferWriter
 from constants import Constants
 
 class NodePush:
-    def __init__(self, transport, message_store):
-        self.transport = transport
-        self.message_store = message_store
+    def __init__(self, foo, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     async def push_msg_waiting(self):
         if self.message_store.count() > 0:
