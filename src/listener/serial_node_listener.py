@@ -1,9 +1,36 @@
 # serial_node_listener.py
+import asyncio
+import serial_asyncio
 from listener.node_listener import NodeListener
-from listener.serial_transport import SerialTransport
 
 class SerialNodeListener(NodeListener):
     def __init__(self, port="/dev/ttyS0", baudrate=9600,
                  contact_store=None, message_store=None):
-        transport = SerialTransport(port, baudrate)
-        super().__init__(transport, contact_store=contact_store, message_store=message_store)
+        super().__init__(contact_store=contact_store, message_store=message_store)
+        self.port = port
+        self.baudrate = baudrate
+        self.reader = None
+        self.writer = None
+
+
+    async def open(self):
+        self.reader, self.writer = await serial_asyncio.open_serial_connection(
+            url=self.port, baudrate=self.baudrate
+        )
+        self.emit("listening")
+
+    async def send_from_node(self, data: bytes):
+        if self.writer:
+            self.writer.write(data)
+            await self.writer.drain()
+
+    async def receive_to_node(self) -> bytes:
+        if self.reader:
+            return await self.reader.read(1024)
+        return b""
+
+    async def close(self):
+        if self.writer:
+            self.writer.close()
+            await self.writer.wait_closed()
+        self.emit("stopped")
