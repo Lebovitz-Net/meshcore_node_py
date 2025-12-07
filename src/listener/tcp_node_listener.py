@@ -7,7 +7,7 @@ class TCPNodeListener(NodeListener):
                  contact_store=None, message_store=None, can_route=True):
         super().__init__(contact_store=contact_store,
                          message_store=message_store,
-			 can_route=can_route)
+			             can_route=can_route)
         self.host = host
         self.port = port
         self.server = None
