@@ -4,10 +4,11 @@ from sx1262.sx1262 import SX1262
 
 class SX1262NodeListener(NodeListener):
     def __init__(self, 
-                 port="/dev/ttyS0", 
-                 baudrate=9600,
-                 contact=None, 
-                 message=None):
+                 port="/dev/ttyS0" 
+                #  baudrate=9600,
+                #  contact=None, 
+                #  message=None
+                ):
         super().__init__(contact_store=contact,
                          message_store=message)
         self.port = port
