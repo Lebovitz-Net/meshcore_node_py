@@ -35,9 +35,9 @@ class NodeManager:
 
         self.sx1262_listener = SX1262NodeListener(
             sx1262_port,
-            sx1262_baud,
-            self.contact_store,
-            self.message_store
+            sx1262_baud
+            # self.contact_store,
+            # self.message_store
         )
         # self._listeners.append(self.sx1262_listener)
 
