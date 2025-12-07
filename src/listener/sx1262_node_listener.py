@@ -6,10 +6,10 @@ class SX1262NodeListener(NodeListener):
     def __init__(self, 
                  port="/dev/ttyS0", 
                  baudrate=9600,
-                 contact_store=None, 
-                 message_store=None):
-        # super().__init__(contact_store=contact_store,
-        #                  message_store=message_store)
+                 contact=None, 
+                 message=None):
+        super().__init__(contact_store=contact,
+                         message_store=message)
         self.port = port
         self.baudrate = baudrate
         self.radio = SX1262(serial_port=port, baudrate=baudrate)
