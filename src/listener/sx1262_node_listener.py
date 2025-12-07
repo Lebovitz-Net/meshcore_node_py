@@ -3,7 +3,7 @@ from listener.node_listener import NodeListener
 from sx1262.sx1262 import SX1262
 
 class SX1262NodeListener(NodeListener):
-    def __init__(self, port="/dev/ttyS0", baudrate=9600, contact=None):
+    def __init__(self, port="/dev/ttyS0", baudrate=9600, contact_store=None, message_store=None):
                 # port="/dev/ttyS0" 
                 #  baudrate=9600,
                 #  contact=None, 
