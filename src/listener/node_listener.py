@@ -14,7 +14,7 @@ class NodeListener(EventEmitter,
                    NodeMetrics,
                    NodeInfo,
                    NodePush):
-    def __init__(self, contact_store=None, message_store=None, *args, **kwargs):
+    def __init__(self, dummy=1, dummy2=2, contact_store=None, message_store=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.contact_store = contact_store
         self.message_store = message_store
