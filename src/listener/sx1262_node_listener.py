@@ -9,8 +9,7 @@ class SX1262NodeListener(NodeListener):
                 #  contact=None, 
                 #  message=None
                 # ):
-        # super().__init__(contact_store=contact,
-        #                  message_store=message)
+        super().__init__()
     #     self.port = port
     #     self.baudrate = baudrate
     #     self.radio = SX1262(serial_port=port, baudrate=baudrate)
