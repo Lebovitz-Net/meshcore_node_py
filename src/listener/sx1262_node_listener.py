@@ -8,7 +8,7 @@ class SX1262NodeListener(NodeListener):
         super().__init__(contact_store=contact_store,
                          message_store=message_store)
         self.port = port
-        self.baudrate - baudrate
+        self.baudrate = baudrate
         self.radio = SX1262(serial_port=port, baudrate=baudrate)
         self._queue = asyncio.Queue()
         self._running = False
