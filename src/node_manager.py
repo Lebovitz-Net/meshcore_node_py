@@ -1,7 +1,7 @@
 # src/node_manager.py
 import asyncio
 from listener.tcp_node_listener import TCPNodeListener
-# from listener.sx1262_node_listener import SX1262NodeListener
+from listener.sx1262_node_listener import SX1262NodeListener
 from store.contact_store import ContactStore
 from store.message_store import MessageStore
 
@@ -35,9 +35,9 @@ class NodeManager:
 
         self.sx1262_listener = SX1262NodeListener(
             sx1262_port,
-            sx1262_baud
-            # self.contact_store,
-            # self.message_store
+            sx1262_baud,
+            self.contact_store,
+            self.message_store
         )
         # self._listeners.append(self.sx1262_listener)
 
