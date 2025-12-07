@@ -14,7 +14,7 @@ class NodeListener(EventEmitter,
                    NodeMetrics,
                    NodeInfo,
                    NodePush):
-    def __init__(self, contact_store, message_store, *args, **kwargs):
+    def __init__(self, contact_store=None, message_store=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.contact_store = contact_store
         self.message_store = message_store
@@ -93,13 +93,6 @@ class NodeListener(EventEmitter,
             except Exception as e:
                  self.emit("error", {"error": e})
             await asyncio.sleep(0.01)
-
-    async def on_frame_received(self, frame_bytes: bytes):
-        reader = BufferReader(frame_bytes)
-        cmd = reader.read_uint8()
-        # This method should be overridden or wired to a dispatcher
-        # e.g., call an injected dispatcher: self._dispatch(cmd, reader)
-        self.emit("debug", {"cmd": cmd})
 
     async def send_from_node(self, data: bytes):
         raise NotImplementedError("Transport must implement send()")
