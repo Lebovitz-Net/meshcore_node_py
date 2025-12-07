@@ -3,7 +3,7 @@ from buffer.buffer_writer import BufferWriter
 from constants import Constants
 
 class NodeMessages:
-    def __init__(self, foo, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     async def handle_send_txt_msg(self, reader: BufferReader, transport, message_store):

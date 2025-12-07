@@ -3,7 +3,7 @@ from buffer.buffer_writer import BufferWriter
 from constants import Constants
 
 class NodeMetrics:
-    def __init__(self, foo, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     async def handle_get_battery_voltage(self, reader: BufferReader):

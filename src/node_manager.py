@@ -33,12 +33,12 @@ class NodeManager:
             )
             self._listeners.append(self.tcp_listener)
 
-        # self.sx1262_listener = SX1262NodeListener(
-        #     sx1262_port,
-        #     sx1262_baud,
-        #     self.contact_store,
-        #     self.message_store
-        # )
+        self.sx1262_listener = SX1262NodeListener(
+            sx1262_port,
+            sx1262_baud,
+            self.contact_store,
+            self.message_store
+        )
         # self._listeners.append(self.sx1262_listener)
 
     async def start(self):

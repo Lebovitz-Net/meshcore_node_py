@@ -4,7 +4,7 @@ from buffer.buffer_writer import BufferWriter
 from constants import Constants
 
 class NodeInfo:
-    def __init__(self, foo, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     # Responses
