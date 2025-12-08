@@ -3,10 +3,8 @@ import asyncio
 from listener.node_listener import NodeListener
 
 class TCPNodeListener(NodeListener):
-    def __init__(self, host="0.0.0.0", port=9000,
-                 contact_store=None, message_store=None, can_route=True):
-        super().__init__(contact_store=contact_store,
-                         message_store=message_store)
+    def __init__(self, host="0.0.0.0", port=9000, can_route=True):
+        super().__init__()
         self.host = host
         self.port = port
         self.server = None

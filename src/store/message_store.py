@@ -1,15 +1,33 @@
+# storage/message_store.py
+# MessageStore provides convenience functions into the generalized StorageManager.
+# It does not need to inherit from StorageManager; instead, it wraps the singleton instance.
+# This keeps StorageManager generic and allows MessageStore to specialize for "messages".
+
+from .storage_manager import StorageManager
+
 class MessageStore:
     def __init__(self):
-        self._messages = []
+        # Always use the singleton StorageManager
+        self._store = StorageManager()
+        # Ensure the "messages" data type exists
+        self._store.add_data_type("messages")
 
-    def add_message(self, msg: dict):
-        self._messages.append(msg)
+    def add_message(self, message):
+        """Add a message to the store."""
+        self._store.add_data("messages", message)
 
-    def all_messages(self) -> list[dict]:
-        return self._messages
+    def all_messages(self):
+        """Return all messages."""
+        return self._store.all_data("messages")
 
-    def get_messages_for_contact(self, pubkey_prefix: str) -> list[dict]:
-        return [m for m in self._messages if m.get("pubkey_prefix") == pubkey_prefix]
+    def get_message(self, index: int):
+        """Get a specific message by index."""
+        return self._store.get_data("messages", index)
 
-    def get_messages_for_channel(self, channel_idx: int) -> list[dict]:
-        return [m for m in self._messages if m.get("channel_idx") == channel_idx]
+    def remove_message(self, index: int):
+        """Remove a specific message by index."""
+        self._store.remove_data("messages", index)
+
+    def clear_messages(self):
+        """Clear all messages."""
+        self._store.clear_data("messages")

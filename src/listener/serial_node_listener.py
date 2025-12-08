@@ -4,9 +4,8 @@ import serial_asyncio
 from listener.node_listener import NodeListener
 
 class SerialNodeListener(NodeListener):
-    def __init__(self, port="/dev/ttyS0", baudrate=9600,
-                 contact_store=None, message_store=None):
-        super().__init__(contact_store=contact_store, message_store=message_store)
+    def __init__(self, port="/dev/ttyS0", baudrate=9600):
+        super().__init__()
         self.port = port
         self.baudrate = baudrate
         self.reader = None

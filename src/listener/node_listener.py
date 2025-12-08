@@ -7,6 +7,8 @@ from .node_info import NodeInfo
 from .node_push import NodePush
 from src.buffer.buffer_reader import BufferReader
 from src.constants import Constants
+from src.store.message_store import MessageStore
+from src.store.contact_store import ContactStore
 
 class NodeListener(EventEmitter,
                    NodeMessages,
@@ -14,10 +16,10 @@ class NodeListener(EventEmitter,
                    NodeMetrics,
                    NodeInfo,
                    NodePush):
-    def __init__(self, contact_store=None, message_store=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.contact_store = contact_store
-        self.message_store = message_store
+        self.contact_store = MessageStore()
+        self.message_store = ContactStore()
 
     async def on_frame_received(self, frame_bytes: bytes):
         reader = BufferReader(frame_bytes)

@@ -6,13 +6,13 @@ class NodeMessages:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    async def handle_send_txt_msg(self, reader: BufferReader, transport, message_store):
+    async def handle_send_txt_msg(self, reader: BufferReader):
         txt_type = reader.read_uint8()
         sender_timestamp = reader.read_uint32_le()
         pubkey_prefix = reader.read_bytes(6)
         text = reader.read_string()
 
-        message_store.add({
+        self.message_store.add({
             "from": pubkey_prefix,
             "text": text,
             "timestamp": sender_timestamp,
@@ -28,13 +28,13 @@ class NodeMessages:
         writer.write_string(text)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_send_channel_txt_msg(self, reader: BufferReader, transport, message_store):
+    async def handle_send_channel_txt_msg(self, reader: BufferReader):
         txt_type = reader.read_uint8()
         channel_idx = reader.read_uint8()
         sender_timestamp = reader.read_uint32_le()
         text = reader.read_string()
 
-        message_store.add_message({
+        self.message_store.add_message({
             "channel_idx": channel_idx,
             "text": text,
             "timestamp": sender_timestamp,
@@ -50,8 +50,8 @@ class NodeMessages:
         writer.write_string(text)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_sync_next_message(self, transport, message_store):
-        msg = message_store.get_next()
+    async def handle_sync_next_message(self):
+        msg = self.message_store.get_next()
         writer = BufferWriter()
         if msg:
             if "channel_idx" in msg:
@@ -72,8 +72,8 @@ class NodeMessages:
             writer.write_uint8(Constants.ResponseCodes.NoMoreMessages)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_get_contacts(self, transport, contact_store):
-        for contact in contact_store.all_contacts():
+    async def handle_get_contacts(self):
+        for contact in self.contact_store.all_contacts():
             writer = BufferWriter()
             writer.write_uint8(Constants.ResponseCodes.Contact)
             writer.write_bytes(contact["public_key"])
@@ -84,14 +84,14 @@ class NodeMessages:
         writer.write_uint8(Constants.ResponseCodes.EndOfContacts)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_add_update_contact(self, reader: BufferReader, transport, contact_store):
+    async def handle_add_update_contact(self, reader: BufferReader):
         public_key = reader.read_bytes(32)
         adv_name = reader.read_cstring(32)
         last_advert = reader.read_uint32_le()
         adv_lat = reader.read_uint32_le()
         adv_lon = reader.read_uint32_le()
 
-        contact_store.add_contact({
+        self.contact_store.add_contact({
             "public_key": public_key,
             "name": adv_name,
             "last_advert": last_advert,
@@ -103,16 +103,16 @@ class NodeMessages:
         writer.write_uint8(Constants.ResponseCodes.Ok)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_remove_contact(self, reader: BufferReader, transport, contact_store):
+    async def handle_remove_contact(self, reader: BufferReader):
         pubkey = reader.read_bytes(32)
-        contact_store.remove_contact(pubkey)
+        self.contact_store.remove_contact(pubkey)
         writer = BufferWriter()
         writer.write_uint8(Constants.ResponseCodes.Ok)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_share_contact(self, reader: BufferReader, transport, contact_store):
+    async def handle_share_contact(self, reader: BufferReader):
         pubkey = reader.read_bytes(32)
-        contact = contact_store.get_contact(pubkey)
+        contact = self.contact_store.get_contact(pubkey)
         writer = BufferWriter()
         if contact:
             writer.write_uint8(Constants.ResponseCodes.ExportContact)
@@ -123,9 +123,9 @@ class NodeMessages:
             writer.write_uint8(Constants.ErrorCodes.NotFound)
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_export_contact(self, reader: BufferReader, transport, contact_store):
+    async def handle_export_contact(self, reader: BufferReader):
         pubkey = reader.read_bytes(32)
-        contact = contact_store.get_contact(pubkey)
+        contact = self.contact_store.get_contact(pubkey)
         writer = BufferWriter()
         writer.write_uint8(Constants.ResponseCodes.ExportContact)
         if contact:
@@ -133,9 +133,9 @@ class NodeMessages:
             writer.write_string(contact.get("name", ""))
         await self.send_from_node(writer.to_bytes())
 
-    async def handle_import_contact(self, reader: BufferReader, transport, contact_store):
+    async def handle_import_contact(self, reader: BufferReader):
         advert_packet_bytes = reader.read_remaining_bytes()
-        contact_store.add_contact({"public_key": advert_packet_bytes, "name": "Imported"})
+        self.contact_store.add_contact({"public_key": advert_packet_bytes, "name": "Imported"})
         writer = BufferWriter()
         writer.write_uint8(Constants.ResponseCodes.Ok)
         await self.send_from_node(writer.to_bytes())
