@@ -8,10 +8,15 @@ from .sx1262_config import SX1262Config
 from .sx1262_mode import SX1262Mode
 from .sx1262_status import SX1262Status
 
-CS_PIN   = 21   # Chip select
-RST_PIN  = 18   # Reset
-BUSY_PIN = 20   # Busy line
-DIO1_PIN = 16   # Interrupt (RX/TX done)
+# CS_PIN   = 21   # Chip select
+# RST_PIN  = 18   # Reset
+# BUSY_PIN = 20   # Busy line
+# DIO1_PIN = 16   # Interrupt (RX/TX done)
+
+CS_PIN   = 8    # CE0
+RST_PIN  = 22
+BUSY_PIN = 23
+DIO1_PIN = 24
 
 class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
     def __init__(self, spi_bus=0, spi_dev=0, max_speed=500000):
@@ -107,7 +112,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         self.spi.close()
         GPIO.cleanup()
         print("SX1262 shutdown complete.")
-        
+
     # inside sx1262.py
 
     def start_rx(self, payload_len: int = 64):
