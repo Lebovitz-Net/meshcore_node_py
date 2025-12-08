@@ -94,6 +94,12 @@ class SX1262NodeListener(NodeListener):
             self.radio.set_modulation_params(sf=7, bw_hz=62_500, cr=5)
             self.radio.set_packet_params(preamble_len=8, explicit=True, payload_len=64, crc_on=True)
             self.radio.set_sync_word(0x12)
+            self.radio.start_rx()
+
+            while True:
+                pkt = self.radio.poll_rx()
+                if pkt:
+                    print("Got packet:", pkt)
 
             print(f"Radio params set: freq={frequency}, bw={bandwidth}, sf={spreading_factor}, cr={coding_rate}")
         except Exception as e:

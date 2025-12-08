@@ -107,3 +107,26 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         self.spi.close()
         GPIO.cleanup()
         print("SX1262 shutdown complete.")
+        
+    # inside sx1262.py
+
+    def start_rx(self, payload_len: int = 64):
+        """Configure and enter continuous RX mode."""
+        # enter RX continuous
+        self.enter_rx_continuous()
+        self.expected_len = payload_len
+
+    def poll_rx(self) -> bytes | None:
+        """Poll for RX_DONE and return payload if available."""
+        if GPIO.input(DIO1_PIN) == 1:
+            irq = self.get_irq_status()
+            if irq & 0x0040:  # RX_DONE
+                data = self.read_buffer(0, self.expected_len)
+                self.clear_irq()
+                return data
+            elif irq & 0x0020:  # CRC_ERR
+                print("CRC error")
+            elif irq & 0x0080:  # TIMEOUT
+                print("RX timeout")
+            self.clear_irq()
+        return None
