@@ -40,11 +40,6 @@ class SX1262NodeListener(NodeListener):
     async def send_to_radio(self, data: bytes):
         await self.send_from_node(data)
 
-
-    def __init__(self, port="/dev/ttyS0", baudrate=9600):
-        super().__init__()
-
-
     async def open(self):
         self._running = True
         self._task = asyncio.create_task(self._poll_radio())
