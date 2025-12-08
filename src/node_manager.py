@@ -49,6 +49,7 @@ class NodeManager:
         for listener in self._listeners:
             transport = getattr(listener, "transport", None)
             if transport and hasattr(transport, "set_radio_params"):
+                print("setting radio params")
                 transport.set_radio_params(
                     frequency=910_525_000,
                     bandwidth=62_500,
