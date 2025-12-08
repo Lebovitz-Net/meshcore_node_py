@@ -7,9 +7,7 @@ from listener.sx1262_node_listener import SX1262NodeListener
 class NodeManager:
     def __init__(self,
                  role: str = "router",
-                 tcp_port: int = 9000,
-                 spi_bus: int = 0,
-                 spi_dev: int = 0):
+                 tcp_port: int = 9000):
         """
         NodeManager orchestrates listeners based on role:
         - companion: Companion Radio (TCP + SX1262, TCP cannot route)
@@ -22,7 +20,7 @@ class NodeManager:
             self.tcp_listener = TCPNodeListener(tcp_port, False)
             self._listeners.append(self.tcp_listener)
 
-        self.sx1262_listener = SX1262NodeListener(spi_bus, spi_dev)
+        self.sx1262_listener = SX1262NodeListener(0, 0)
         self._listeners.append(self.sx1262_listener)
 
     async def start(self):
