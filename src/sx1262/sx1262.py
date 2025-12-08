@@ -55,6 +55,7 @@ class SX1262 (SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
             resp = self.spi.xfer2([0x1E, 0x00, 0x00])  # adjust length
             print("Received raw:", resp)
             return bytes(resp)
+        print("no read")
         return b""
 
     def shutodwn(self):
@@ -68,7 +69,9 @@ class SX1262 (SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         self.spi.close()
         GPIO.cleanup()
         print("SX1262 shutdown complete.")
-        
+
+    # these are protbably deprecated
+
     def encode_freq(self, frequency_hz: float) -> bytes:
         # Datasheet-specific encoding
         freq_val = int(frequency_hz / 1e3)
