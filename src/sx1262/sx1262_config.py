@@ -36,6 +36,12 @@ class SX1262Config:
             iq
         ])
 
+    def set_packet_type_lora(self):
+        """Select LoRa packet type."""
+        # SetPacketType opcode = 0x8A, LoRa type = 0x01
+        return self._spi_cmd(0x8A, [0x01])
+
+
     def set_sync_word(self, word: int):
         """Set LoRa sync word (0x34 public, 0x12 private)."""
         # WriteRegister opcode = 0x0D
