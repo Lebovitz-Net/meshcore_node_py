@@ -5,6 +5,7 @@ from node_manager import NodeManager
 
 
 async def main():
+    # parser for command lines
     parser = argparse.ArgumentParser(description="Start a MeshCore node")
 
     parser.add_argument(
