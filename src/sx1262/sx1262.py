@@ -8,14 +8,12 @@ from .sx1262_config import SX1262Config
 from .sx1262_mode import SX1262Mode
 from .sx1262_status import SX1262Status
 
-# Pin mappings (check Waveshare docs for your variant)
 CS_PIN   = 21   # Chip select
 RST_PIN  = 18   # Reset
 BUSY_PIN = 20   # Busy line
 DIO1_PIN = 16   # Interrupt (RX/TX done)
 
-class SX1262 (SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
-
+class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
     def __init__(self, spi_bus=0, spi_dev=0, max_speed=500000):
         # Setup GPIO
         GPIO.setmode(GPIO.BCM)
@@ -35,56 +33,77 @@ class SX1262 (SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
 
+        # Configure IRQ mapping once at startup
+        self.set_dio_irq_params(rx_done=True, tx_done=True, timeout=True, crc_err=True)
+        self.clear_irq()
+
+        print("SX1262 initialized and IRQs mapped to DIO1")
+
+    def set_dio_irq_params(self, rx_done=True, tx_done=True, timeout=True, crc_err=True):
+        """Map IRQs to DIO1 (RX/TX done, timeout, CRC error)."""
+        IRQ_RX_DONE   = 0x0040
+        IRQ_TX_DONE   = 0x0001
+        IRQ_TIMEOUT   = 0x0080
+        IRQ_CRC_ERR   = 0x0020
+
+        irq_mask = 0
+        if rx_done: irq_mask |= IRQ_RX_DONE
+        if tx_done: irq_mask |= IRQ_TX_DONE
+        if timeout: irq_mask |= IRQ_TIMEOUT
+        if crc_err: irq_mask |= IRQ_CRC_ERR
+
+        dio1_mask = irq_mask
+        dio2_mask = 0x0000
+        dio3_mask = 0x0000
+
+        return self._spi_cmd(0x08, [
+            (irq_mask >> 8) & 0xFF, irq_mask & 0xFF,
+            (dio1_mask >> 8) & 0xFF, dio1_mask & 0xFF,
+            (dio2_mask >> 8) & 0xFF, dio2_mask & 0xFF,
+            (dio3_mask >> 8) & 0xFF, dio3_mask & 0xFF
+        ])
+
+    def clear_irq(self, mask: int = 0xFFFF):
+        """Clear IRQ flags (default: all)."""
+        return self._spi_cmd(0x02, [(mask >> 8) & 0xFF, mask & 0xFF])
+
+ 
     def _wait_busy(self):
         while GPIO.input(BUSY_PIN) == 1:
             time.sleep(0.001)
 
+    def _spi_cmd(self, opcode: int, params: list[int] = None):
+        """General SPI command wrapper with BUSY wait."""
+        if params is None:
+            params = []
+        self._wait_busy()
+        frame = [opcode] + params
+        return self.spi.xfer2(frame)
+
     def send(self, payload: bytes):
         """Send a packet over LoRa."""
-        self._wait_busy()
-        # Example: write buffer command (0x0E) then payload
-        self.spi.xfer2([0x0E, 0x00] + list(payload))
-        # Trigger TX (opcode 0x83 with timeout)
-        self.spi.xfer2([0x83, 0x00, 0x00, 0x00])
+        # WriteBuffer (0x0E) then payload
+        self._spi_cmd(0x0E, [0x00] + list(payload))
+        # Trigger TX (SetTx opcode 0x83 with timeout)
+        self._spi_cmd(0x83, [0x00, 0x00, 0x00])
         print("Packet sent:", payload)
 
     def read(self) -> bytes:
         """Read a packet if available."""
         if GPIO.input(DIO1_PIN) == 1:  # RX done IRQ
-            self._wait_busy()
-            # Read buffer command (0x1E)
-            resp = self.spi.xfer2([0x1E, 0x00, 0x00])  # adjust length
+            # ReadBuffer (0x1E)
+            resp = self._spi_cmd(0x1E, [0x00, 0x00])  # adjust length as needed
             print("Received raw:", resp)
             return bytes(resp)
-        print("no read")
         return b""
 
-    def shutodwn(self):
+    def shutdown(self):
         self.close()
-    
+
     def close(self):
         """Shutdown the radio and release resources."""
-        self._wait_busy()
         # Put chip into sleep (opcode 0x84)
-        self.spi.xfer2([0x84, 0x00])
+        self._spi_cmd(0x84, [0x00])
         self.spi.close()
         GPIO.cleanup()
         print("SX1262 shutdown complete.")
-
-    # these are protbably deprecated
-
-    def encode_freq(self, frequency_hz: float) -> bytes:
-        # Datasheet-specific encoding
-        freq_val = int(frequency_hz / 1e3)
-        return freq_val.to_bytes(3, "little")
-
-    def encode_bw(self, bandwidth_hz: float) -> bytes:
-        bw_map = {62500: b"\x01", 125000: b"\x02", 250000: b"\x03"}
-        return bw_map.get(int(bandwidth_hz), b"\x00")
-
-    def encode_sf(self, sf: int) -> bytes:
-        return bytes([sf])
-
-    def encode_cr(self, cr: str) -> bytes:
-        cr_map = {"4/5": b"\x01", "4/6": b"\x02", "4/7": b"\x03", "4/8": b"\x04"}
-        return cr_map.get(cr, b"\x00")

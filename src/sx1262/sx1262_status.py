@@ -1,34 +1,32 @@
-import spidev
-import RPi.GPIO as GPIO
-import time
-
+# sx1262_status.py
 class SX1262Status:
-
     def get_irq_status(self) -> int:
         """Read IRQ flags."""
-        self._wait_busy()
-        resp = self.spi.xfer2([0x15, 0x00, 0x00])
+        # GetIrqStatus opcode = 0x12 (datasheet)
+        resp = self._spi_cmd(0x12, [0x00, 0x00])
         return (resp[1] << 8) | resp[2]
 
-    def clear_irq_status(self):
+    def clear_irq_status(self, mask: int = 0xFFFF):
         """Clear IRQ flags."""
-        self._wait_busy()
-        self.spi.xfer2([0x97, 0xFF, 0xFF])
+        # ClearIrqStatus opcode = 0x02
+        return self._spi_cmd(0x02, [(mask >> 8) & 0xFF, mask & 0xFF])
 
     def get_rssi(self) -> int:
-        """Read RSSI value."""
-        self._wait_busy()
-        resp = self.spi.xfer2([0x1B, 0x00])
+        """Read RSSI value (last packet)."""
+        # GetPacketStatus opcode = 0x14
+        resp = self._spi_cmd(0x14, [0x00])
+        # RSSI is in resp[1], offset per datasheet
         return resp[1]
 
     def get_snr(self) -> int:
-        """Read SNR value."""
-        self._wait_busy()
-        resp = self.spi.xfer2([0x1C, 0x00])
-        return resp[1]
+        """Read SNR value (last packet)."""
+        # GetPacketStatus opcode = 0x14
+        resp = self._spi_cmd(0x14, [0x00])
+        # SNR is in resp[2], offset per datasheet
+        return resp[2]
 
     def get_device_status(self) -> int:
         """Read device status."""
-        self._wait_busy()
-        resp = self.spi.xfer2([0xC0, 0x00])
+        # GetStatus opcode = 0xC0
+        resp = self._spi_cmd(0xC0, [0x00])
         return resp[1]
