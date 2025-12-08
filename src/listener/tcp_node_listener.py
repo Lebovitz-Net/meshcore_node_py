@@ -25,6 +25,7 @@ class TCPNodeListener(NodeListener):
         print("Client connected")
         while True:
             data = await reader.read(1024)
+            print("oh oh, something happened")
             if not data:
                 break
             # Emit frame event for NodeListener
