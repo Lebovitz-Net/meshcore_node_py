@@ -47,8 +47,8 @@ class NodeManager:
         await asyncio.gather(*tasks)
         # General radio discovery
         for listener in self._listeners:
-            print("setting radio params", listener)
-            if hasattr(listener, "set_radio_params"):
+            print("setting radio params", listener.set_radio_params)
+            if listener and hasattr(listener, "set_radio_params"):
                 await listener.set_radio_params(
                     frequency=910_525_000,
                     bandwidth=62_500,
