@@ -48,7 +48,7 @@ class NodeManager:
         # General radio discovery
         for listener in self._listeners:
             transport = getattr(listener, "transport", None)
-            print("setting radio params", transport)
+            print("setting radio params", listener, transport)
             if transport and hasattr(transport, "set_radio_params"):
                 transport.set_radio_params(
                     frequency=910_525_000,
