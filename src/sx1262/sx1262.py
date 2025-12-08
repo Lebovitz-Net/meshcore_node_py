@@ -1,68 +1,74 @@
 # sx1262.py
+import spidev
 import RPi.GPIO as GPIO
-import serial
 import time
 
-class SX1262:
-    """
-    Driver for SX1262 LoRa HAT using UART + GPIO control pins.
-    Provides send, read, and shutdown methods for integration
-    with higher-level transports.
-    """
+from .sx1262_buffer import SX1262Buffer
+from .sx1262_config import SX1262Config
+from .sx1262_mode import SX1262Mode
+from .sx1262_status import SX1262Status
 
-    def __init__(self, serial_port="/dev/ttyS0", baudrate=9600,
-                 reset_pin=22, busy_pin=27, m0_pin=17, m1_pin=18):
-        self.serial_port = serial_port
-        self.baudrate = baudrate
-        self.reset_pin = reset_pin
-        self.busy_pin = busy_pin
-        self.m0_pin = m0_pin
-        self.m1_pin = m1_pin
-        # print(f"[SX1262] Setting up GPIO pins {self.reset_pin}")
+# Pin mappings (check Waveshare docs for your variant)
+CS_PIN   = 21   # Chip select
+RST_PIN  = 18   # Reset
+BUSY_PIN = 20   # Busy line
+DIO1_PIN = 16   # Interrupt (RX/TX done)
+
+class SX1262 (SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
+
+    def __init__(self, spi_bus=0, spi_dev=0, max_speed=500000):
         # Setup GPIO
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.reset_pin, GPIO.OUT)
-        GPIO.setup(self.busy_pin, GPIO.IN)
-        GPIO.setup(self.m0_pin, GPIO.OUT)
-        GPIO.setup(self.m1_pin, GPIO.OUT)
+        GPIO.setup(RST_PIN, GPIO.OUT)
+        GPIO.setup(BUSY_PIN, GPIO.IN)
+        GPIO.setup(DIO1_PIN, GPIO.IN)
 
-        # Reset the chip
-        GPIO.output(self.reset_pin, GPIO.LOW)
-        time.sleep(0.1)
-        GPIO.output(self.reset_pin, GPIO.HIGH)
+        # Setup SPI
+        self.spi = spidev.SpiDev()
+        self.spi.open(spi_bus, spi_dev)
+        self.spi.max_speed_hz = max_speed
 
-        # Setup UART
-        try:
-            self.ser = serial.Serial(self.serial_port, self.baudrate, timeout=1)
-        except serial.SerialException as e:
-            raise RuntimeError(f"Failed to open {self.serial_port}: {e}")
+        # Reset chip
+        GPIO.output(RST_PIN, GPIO.LOW)
+        time.sleep(0.01)
+        GPIO.output(RST_PIN, GPIO.HIGH)
+        time.sleep(0.01)
 
-    def send(self, data: bytes):
-        """
-        Send a packet over LoRa.
-        """
-        GPIO.output(self.m0_pin, GPIO.LOW)  # normal mode
-        GPIO.output(self.m1_pin, GPIO.LOW)
-        time.sleep(0.05)
-        self.ser.write(data)
+    def _wait_busy(self):
+        while GPIO.input(BUSY_PIN) == 1:
+            time.sleep(0.001)
+
+    def send(self, payload: bytes):
+        """Send a packet over LoRa."""
+        self._wait_busy()
+        # Example: write buffer command (0x0E) then payload
+        self.spi.xfer2([0x0E, 0x00] + list(payload))
+        # Trigger TX (opcode 0x83 with timeout)
+        self.spi.xfer2([0x83, 0x00, 0x00, 0x00])
+        print("Packet sent:", payload)
 
     def read(self) -> bytes:
-        """
-        Read a packet if available.
-        """
-        if self.ser.in_waiting > 0:
-            return self.ser.read(self.ser.in_waiting)
+        """Read a packet if available."""
+        if GPIO.input(DIO1_PIN) == 1:  # RX done IRQ
+            self._wait_busy()
+            # Read buffer command (0x1E)
+            resp = self.spi.xfer2([0x1E, 0x00, 0x00])  # adjust length
+            print("Received raw:", resp)
+            return bytes(resp)
         return b""
 
-    def shutdown(self):
-        """
-        Clean up GPIO and close serial.
-        """
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        if GPIO.getmode() is not None:
-            GPIO.cleanup()
-
+    def shutodwn(self):
+        self.close()
+    
+    def close(self):
+        """Shutdown the radio and release resources."""
+        self._wait_busy()
+        # Put chip into sleep (opcode 0x84)
+        self.spi.xfer2([0x84, 0x00])
+        self.spi.close()
+        GPIO.cleanup()
+        print("SX1262 shutdown complete.")
+        
     def encode_freq(self, frequency_hz: float) -> bytes:
         # Datasheet-specific encoding
         freq_val = int(frequency_hz / 1e3)

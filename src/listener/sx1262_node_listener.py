@@ -1,31 +1,78 @@
 import asyncio
 from listener.node_listener import NodeListener
-from sx1262.sx1262 import SX1262
+from sx1262.sx1262 import SX1262  # new SPI/GPIO driver for Waveshare LoRaWAN HAT
 
 class SX1262NodeListener(NodeListener):
-    def __init__(self, port="/dev/ttyS0", baudrate=9600, contact_store=None, message_store=None):
-        super().__init__(contact_store, message_store)
-        self.port = port
-        self.baudrate = baudrate
-        self.radio = SX1262(serial_port=port, baudrate=baudrate)
+    """
+    NodeListener implementation for the SX1262 LoRaWAN HAT using SPI + GPIO driver.
+    Provides async lifecycle management, send/receive integration, and radio configuration.
+    """
+
+    def __init__(self, spi_bus=0, spi_dev=0, max_speed=500000):
+        super().__init__()
+        # Instantiate the SPI/GPIO driver (no serial args required)
+        self.radio = SX1262(spi_bus, spi_dev, max_speed)
         self._queue = asyncio.Queue()
         self._running = False
-        self._task = None
+        self._poll_task = None
+        self._consume_task = None
 
     async def start(self):
+        """Start the listener and begin consuming radio frames."""
         await self.open()
-        print(f"SX1262NodeListener listening on {self.port} @ {self.baudrate}")
+        print("SX1262NodeListener listening via SPI driver")
         await super().start()
-        self._task = asyncio.create_task(self._consume_radio())
+        self._consume_task = asyncio.create_task(self._consume_radio())
 
     async def stop(self):
-        if self._task:
-            self._task.cancel()
-            await asyncio.gather(self._task, return_exceptions=True)
+        """Stop the listener and clean up tasks/resources."""
+        if self._consume_task:
+            self._consume_task.cancel()
+            await asyncio.gather(self._consume_task, return_exceptions=True)
         await self.close()
         await super().stop()
 
+    async def open(self):
+        """Open the radio interface and start polling for data."""
+        self._running = True
+        self._poll_task = asyncio.create_task(self._poll_radio())
+        self.emit("listening")
+
+    async def close(self):
+        """Close the radio interface and stop polling."""
+        self._running = False
+        if self._poll_task:
+            self._poll_task.cancel()
+            await asyncio.gather(self._poll_task, return_exceptions=True)
+        self.radio.close()
+        self.emit("stopped")
+
+    async def send_to_radio(self, data: bytes):
+        """Send data from higher layers down to the radio."""
+        await self.send_from_node(data)
+
+    async def send_from_node(self, data: bytes):
+        """Send raw bytes via the SX1262 driver."""
+        self.radio.send(data)
+
+    async def receive_to_node(self) -> bytes:
+        """Receive raw bytes from the radio into the node."""
+        return await self._queue.get()
+
+    async def _poll_radio(self):
+        """Poll the radio for incoming data and enqueue it."""
+        while self._running:
+            try:
+                data = self.radio.read()
+                if data:
+                    print("Got data from SX1262 device")
+                    await self._queue.put(data)
+            except Exception as e:
+                self.emit("error", {"error": e})
+            await asyncio.sleep(0.1)
+
     async def _consume_radio(self):
+        """Consume data from the queue and deliver to NodeListener callbacks."""
         while True:
             try:
                 data = await self.receive_to_node()
@@ -37,45 +84,16 @@ class SX1262NodeListener(NodeListener):
                 self.emit("error", {"error": e})
             await asyncio.sleep(0.05)
 
-    async def send_to_radio(self, data: bytes):
-        await self.send_from_node(data)
-
-    async def open(self):
-        self._running = True
-        self._task = asyncio.create_task(self._poll_radio())
-        self.emit("listening")
-
-    async def close(self):
-        self._running = False
-        if self._task:
-            self._task.cancel()
-            await asyncio.gather(self._task, return_exceptions=True)
-        self.radio.shutdown()
-        self.emit("stopped")
-
-    async def send_from_node(self, data: bytes):
-        self.radio.send(data)
-
-    async def receive_to_node(self) -> bytes:
-        return await self._queue.get()
-
-    async def _poll_radio(self):
-        while self._running:
-            data = self.radio.read()
-            if data:
-                print("got some data from the lora device")
-                await self._queue.put(data)
-            await asyncio.sleep(0.1)
-
     async def set_radio_params(self, frequency, bandwidth, spreading_factor, coding_rate):
         """
-        High-level API: configure the radio with given parameters.
+        Configure the SX1262 radio with given parameters.
+        Delegates to driver primitives.
         """
-        # Delegate to driver primitives
-        frame = (
-            self.radio.encode_freq(frequency) +
-            self.radio.encode_bw(bandwidth) +
-            self.radio.encode_sf(spreading_factor) +
-            self.radio.encode_cr(coding_rate)
-        )
-        self.radio.send(frame)
+        try:
+            self.radio.set_frequency(frequency)
+            self.radio.set_bandwidth(bandwidth)
+            self.radio.set_spreading_factor(spreading_factor)
+            self.radio.set_coding_rate(coding_rate)
+            print(f"Radio params set: freq={frequency}, bw={bandwidth}, sf={spreading_factor}, cr={coding_rate}")
+        except Exception as e:
+            self.emit("error", {"error": e})
