@@ -63,6 +63,7 @@ class SX1262NodeListener(NodeListener):
         while self._running:
             data = self.radio.read()
             if data:
+                print("got some data from the lora device")
                 await self._queue.put(data)
             await asyncio.sleep(0.1)
 
