@@ -39,7 +39,7 @@ class NodeManager:
             self.contact_store,
             self.message_store
         )
-        # self._listeners.append(self.sx1262_listener)
+        self._listeners.append(self.sx1262_listener)
 
     async def start(self):
         """Start all listeners."""
