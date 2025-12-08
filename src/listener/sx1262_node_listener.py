@@ -67,7 +67,7 @@ class SX1262NodeListener(NodeListener):
                 await self._queue.put(data)
             await asyncio.sleep(0.1)
 
-    def set_radio_params(self, frequency, bandwidth, spreading_factor, coding_rate):
+    async def set_radio_params(self, frequency, bandwidth, spreading_factor, coding_rate):
         """
         High-level API: configure the radio with given parameters.
         """
