@@ -131,46 +131,48 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
             self.clear_irq()
         return None
 
-def listen(self, freq_hz=910_525_000, sf=7, bw_hz=62_500, cr=5,
-           preamble_len=8, payload_len=64, sync_word=0x12):
-    """
-    Configure the radio and listen for packets.
-    Blocks in a simple loop, printing IRQs and payloads.
-    """
+    def listen(self, freq_hz=910_525_000, sf=7, bw_hz=62_500, cr=5,
+            preamble_len=8, payload_len=64, sync_word=0x12):
+        """
+        Configure the radio and listen for packets.
+        Blocks in a simple loop, printing IRQs and payloads.
+        """
 
-    # Basic LoRa setup
-    self.set_packet_type_lora()
-    self.set_frequency(freq_hz)
-    self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
-    self.set_packet_params(preamble_len=preamble_len,
-                           explicit=True,
-                           payload_len=payload_len,
-                           crc_on=True,
-                           iq_inverted=False)
-    self.set_sync_word(sync_word)
+        # Basic LoRa setup
+        self.set_packet_type_lora()
+        self.set_frequency(freq_hz)
+        self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
+        self.set_packet_params(preamble_len=preamble_len,
+                            explicit=True,
+                            payload_len=payload_len,
+                            crc_on=True,
+                            iq_inverted=False)
+        self.set_sync_word(sync_word)
 
-    # Map all IRQs to DIO1
-    self.set_dio_irq_params(rx_done=True, tx_done=True,
-                            timeout=True, crc_err=True)
-    self.clear_irq()
+        # Map all IRQs to DIO1
+        self.set_dio_irq_params(rx_done=True, tx_done=True,
+                                timeout=True, crc_err=True)
+        self.clear_irq()
 
-    # Enter RX continuous mode
-    self.start_rx(payload_len)
+        # Enter RX continuous mode
+        self.start_rx(payload_len)
 
-    print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz} Hz, CR 4/{cr}")
+        print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz} Hz, CR 4/{cr}")
 
-    # Simple loop: check DIO1 and dump IRQs
-    try:
-        while True:
-            if GPIO.input(DIO1_PIN) == 1:
-                irq = self.get_irq_status()
-                if irq & 0x0040:  # RX_DONE
-                    data = self.read_buffer(0, payload_len)
-                    print("RX_DONE:", data)
-                elif irq & 0x0020:  # CRC_ERR
-                    print("CRC error")
-                elif irq & 0x0080:  # TIMEOUT
-                    print("RX timeout")
-                self.clear_irq()
-    except KeyboardInterrupt:
-        print("Stopped listening")
+        # Simple loop: check DIO1 and dump IRQs
+        try:
+            while True:
+                if GPIO.input(DIO1_PIN) == 1:
+                    irq = self.get_irq_status()
+                    if irq & 0x0040:  # RX_DONE
+                        data = self.read_buffer(0, payload_len)
+                        print("RX_DONE:", data)
+                    elif irq & 0x0020:  # CRC_ERR
+                        print("CRC error")
+                    elif irq & 0x0080:  # TIMEOUT
+                        print("RX timeout")
+                    self.clear_irq()
+        except KeyboardInterrupt:
+            print("Stopped listening")
+    from sx1262.sx1262 import SX1262
+
