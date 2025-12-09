@@ -8,9 +8,9 @@ from .sx1262_config import SX1262Config
 from .sx1262_mode import SX1262Mode
 from .sx1262_status import SX1262Status
 
-RST_PIN  = 25
-BUSY_PIN = 5
-DIO1_PIN = 17
+RST_PIN  = 18
+BUSY_PIN = 20
+DIO1_PIN = 16
 
 class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
     def __init__(self, spi_bus=0, spi_dev=0, max_speed=500000):
