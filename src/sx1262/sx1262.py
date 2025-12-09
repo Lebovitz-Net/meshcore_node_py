@@ -174,5 +174,5 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
                     self.clear_irq()
         except KeyboardInterrupt:
             print("Stopped listening")
-    from sx1262.sx1262 import SX1262
+
 
