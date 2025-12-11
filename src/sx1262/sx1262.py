@@ -33,6 +33,12 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
 
+        radio = SX1262()
+        radio.monitor_busy(2.0)
+        radio.send(b"hello")
+        radio.monitor_busy(2.0)
+
+
         # Configure IRQ mapping once at startup
         # Enable RF switch on DIO2
         self._spi_cmd(0x97, [0x00, 0x01, 0x00, 0x00])  # SetDIO2AsRfSwitchCtrl
@@ -67,6 +73,15 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
             (dio2_mask >> 8) & 0xFF, dio2_mask & 0xFF,
             (dio3_mask >> 8) & 0xFF, dio3_mask & 0xFF
         ])
+    
+    def monitor_busy(self, duration=5.0):
+        """Print BUSY pin state for a given duration (seconds)."""
+        start = time.time()
+        while time.time() - start < duration:
+            state = GPIO.input(BUSY_PIN)
+            print(f"{time.time()-start:.3f}s BUSY={state}")
+            time.sleep(0.01)
+
 
     def clear_irq(self, mask: int = 0xFFFF):
         """Clear IRQ flags (default: all)."""
