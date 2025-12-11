@@ -33,12 +33,6 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
 
-        radio = SX1262()
-        radio.monitor_busy(2.0)
-        radio.send(b"hello")
-        radio.monitor_busy(2.0)
-
-
         # Configure IRQ mapping once at startup
         # Enable RF switch on DIO2
         self._spi_cmd(0x97, [0x00, 0x01, 0x00, 0x00])  # SetDIO2AsRfSwitchCtrl

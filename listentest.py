@@ -2,6 +2,11 @@ from sx1262.sx1262 import SX1262
 
 if __name__ == "__main__":
     radio = SX1262(spi_bus=0, spi_dev=0, max_speed=500000)
+
+    radio.monitor_busy(2.0)
+    radio.send(b"hello")
+    radio.monitor_busy(2.0)
+    
     radio.listen(
         freq_hz=910_525_000,
         sf=7,
