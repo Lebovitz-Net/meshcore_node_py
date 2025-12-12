@@ -35,7 +35,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         time.sleep(0.01)
 
         for i in range(50):
-            print("BUSY:", GPIO.input(23))
+            print("BUSY:", GPIO.input(20))
             time.sleep(0.1)
 
         # Configure IRQ mapping once at startup
