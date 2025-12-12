@@ -24,25 +24,18 @@ class SX1262Cmds:
     OP_CLEAR_IRQ_STATUS    = 0x02
     OP_GET_IRQ_STATUS      = 0x12
     OP_GET_STATUS          = 0xC0
-    OP_SET_DIO2_RF_SWITCH  = 0x97
-    OP_SET_DIO3_TCXO       = 0x9D
+    # In sx1262_cmds.py (inside SX1262Cmds)
+    OP_SET_DIO2_RF_SWITCH = 0x97
+    OP_SET_DIO3_TCXO      = 0x9D
+
+    def set_dio2_rf_switch(self, enable: bool = True):
+        # DIO2 as RF switch control (enable=1) or IRQ (enable=0)
+        return self._spi_cmd(self.OP_SET_DIO2_RF_SWITCH, [0x00, 0x01 if enable else 0x00, 0x00, 0x00])
 
     def set_dio3_tcxo(self, voltage: int = 0x02, delay: int = 0x02, trim: int = 0x00):
-        """
-        Configure DIO3 as TCXO control.
-        voltage: one of Semtech's DIO3_OUTPUT_* codes (e.g. 0x02 = 1.8 V).
-        delay: startup delay code (e.g. 0x02 = 2 ms).
-        trim: reserved/trim value (usually 0x00).
-        """
+        # Voltage code and delay code per Semtech mapping; trim/reserved usually 0x00
         return self._spi_cmd(self.OP_SET_DIO3_TCXO, [voltage, delay, trim])
 
-
-    def set_dio2_rf_switch(self, enable=True):
-        """Configure DIO2 as RF switch control."""
-        if enable:
-            return self._spi_cmd(self.OP_SET_DIO2_RF_SWITCH, [0x00, 0x01, 0x00, 0x00])
-        else:
-            return self._spi_cmd(self.OP_SET_DIO2_RF_SWITCH, [0x00, 0x00, 0x00, 0x00])
 
     def _wait_busy(self):
         while GPIO.input(BUSY_PIN) == 1:

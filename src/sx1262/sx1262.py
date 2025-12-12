@@ -9,15 +9,13 @@ from .sx1262_mode import SX1262Mode
 from .sx1262_status import SX1262Status
 from .sx1262_cmds import SX1262Cmds
 
-# Waveshare SPI HAT pin mapping
+# Waveshare-style SPI HAT pin mapping (no TXEN/RXEN variant)
 RST_PIN  = 18   # Reset
 BUSY_PIN = 20   # BUSY (active-high)
 DIO1_PIN = 16   # DIO1 (IRQ: RX_DONE, TIMEOUT, CRC_ERR)
-TXEN_PIN = 6    # TX enable (Waveshare uses only TXEN)
-RXEN_PIN = -1   # Not wired on Waveshare HAT
 
 class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
-    def __init__(self, spi_bus=0, spi_dev=None, max_speed=500000):
+    def __init__(self, spi_bus=0, spi_dev=None, max_speed=500000, use_tcxo=True):
         # If no device specified, probe automatically
         if spi_dev is None:
             spi_dev = self.probe_spi_device(spi_bus)
@@ -36,9 +34,6 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         GPIO.setup(RST_PIN, GPIO.OUT)
         GPIO.setup(BUSY_PIN, GPIO.IN)
         GPIO.setup(DIO1_PIN, GPIO.IN)
-        GPIO.setup(TXEN_PIN, GPIO.OUT)
-        if RXEN_PIN != -1:
-            GPIO.setup(RXEN_PIN, GPIO.OUT)
 
         # Reset chip
         GPIO.output(RST_PIN, GPIO.LOW)
@@ -49,23 +44,23 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         # Enter standby (RC oscillator)
         self.set_standby()
 
-        # Configure RF switch (DIO2) and TCXO (DIO3: 1.8V, 2ms)
+        # Configure RF switch via DIO2 (no TXEN/RXEN on this board)
+        # Enable DIO2 as RF switch control so the chip toggles the antenna path.
         self.set_dio2_rf_switch(True)
-        self.set_dio3_tcxo(voltage=0x02, delay=0x02)
+
+        # Configure TCXO via DIO3 if present on the board
+        if use_tcxo:
+            # Voltage code 0x02 ~ 1.8V; delay code 0x02 ~ 2ms; trim 0x00
+            self.set_dio3_tcxo(voltage=0x02, delay=0x02, trim=0x00)
 
         # Map IRQs to DIO1
         self.set_dio_irq_params(rx_done=True, timeout=True, crc_err=True)
         self.clear_irq()
 
-        # Default TX/RX pins state (receive)
-        GPIO.output(TXEN_PIN, GPIO.LOW)
-        if RXEN_PIN != -1:
-            GPIO.output(RXEN_PIN, GPIO.HIGH)
-
-        print("SX1262 initialized: standby, TCXO, RF switch, IRQs mapped.")
+        print("SX1262 initialized: standby, DIO2 RF switch, TCXO (optional), IRQs mapped.")
 
     # -----------------------------
-    # IRQ handling
+    # IRQ mapping
     # -----------------------------
 
     def set_dio_irq_params(self, rx_done=True, tx_done=False, timeout=True, crc_err=True):
@@ -88,7 +83,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         self._spi_cmd(self.OP_SET_DIO_IRQ_PARAMS, params)
 
     # -----------------------------
-    # Convenience and lifecycle
+    # Lifecycle helpers
     # -----------------------------
 
     def monitor_busy(self, duration=2.0):
@@ -152,7 +147,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
 
                         rssi_raw, snr_raw, sig_rssi_raw = self.get_packet_status()
                         rssi = -rssi_raw / 2.0
-                        snr = snr_raw / 4.0
+                        snr = (snr_raw - 256 if snr_raw > 127 else snr_raw) / 4.0
                         sig_rssi = -sig_rssi_raw / 2.0
 
                         print(f"RX_DONE: len={length}, RSSI={rssi:.1f} dBm, SNR={snr:.2f} dB, signalRSSI={sig_rssi:.1f} dBm")
@@ -173,10 +168,6 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
 
         except KeyboardInterrupt:
             print("Stopped listening")
-        finally:
-            GPIO.output(TXEN_PIN, GPIO.LOW)
-            if RXEN_PIN != -1:
-                GPIO.output(RXEN_PIN, GPIO.LOW)
 
     # -----------------------------
     # spi device probing
