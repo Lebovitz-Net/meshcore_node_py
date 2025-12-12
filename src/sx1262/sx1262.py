@@ -8,7 +8,7 @@ from .sx1262_config import SX1262Config
 from .sx1262_mode import SX1262Mode
 from .sx1262_status import SX1262Status
 
-RST_PIN  = 17
+RST_PIN  = 16
 BUSY_PIN = 23
 DIO1_PIN = 25
 
