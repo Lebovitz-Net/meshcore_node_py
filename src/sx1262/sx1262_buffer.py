@@ -8,13 +8,12 @@ class SX1262Buffer:
         return self._spi_cmd(0x0E, [offset] + list(data))
 
     def read_buffer(self, offset: int, length: int) -> bytes:
-        """Read payload from FIFO buffer."""
-        # Build transmit sequence
+        """Read payload from RX FIFO starting at offset."""
         tx = [self.OP_READ_BUFFER, offset, 0x00] + [0x00] * length
-        # Use the read helper so we get back the response
-        resp = self._spi_cmd_read(self.OP_READ_BUFFER, [offset, 0x00] + [0x00] * length, read_len=3+length)
-        # Slice out the payload (skip opcode echo, offset, dummy)
+        resp = self.spi.xfer2(tx)
+        # Skip the first 3 echo/dummy bytes
         return bytes(resp[3:3+length])
+
 
     def set_buffer_base(self, tx_base: int, rx_base: int):
         """Configure FIFO base addresses."""
