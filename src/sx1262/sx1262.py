@@ -119,12 +119,22 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         self.set_packet_type_lora()
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
-        self.set_packet_params(preamble_len=preamble_len,
-                            explicit=True,
-                            payload_len=payload_len,
-                            crc_on=True,
-                            iq_inverted=False)
-        self.set_sync_word(sync_word)
+        # self.set_packet_params(preamble_len=preamble_len,
+        #                     explicit=True,
+        #                     payload_len=payload_len,
+        #                     crc_on=True,
+        #                     iq_inverted=False)
+        # self.set_sync_word(sync_word)
+        
+        self.set_packet_params(
+            preamble_len=8,
+            explicit=True,
+            payload_len=255,
+            crc_on=False,       # disable temporarily
+            iq_inverted=False
+        )
+        self.set_sync_word(0x12)
+
 
         # IRQ setup
         self.set_dio_irq_params(rx_done=True, timeout=True, crc_err=True)
