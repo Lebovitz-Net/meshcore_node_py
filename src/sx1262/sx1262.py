@@ -33,6 +33,10 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
 
+        for i in range(50):
+            print("BUSY:", GPIO.input(23))
+            time.sleep(0.1)
+
         # Configure IRQ mapping once at startup
         # Enable RF switch on DIO2
         self._spi_cmd(0x97, [0x00, 0x01, 0x00, 0x00])  # SetDIO2AsRfSwitchCtrl
