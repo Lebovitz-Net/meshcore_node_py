@@ -40,7 +40,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         time.sleep(0.01)
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
-
+        self.get_status()
         # Enter standby (RC oscillator)
         self.set_standby()
 
