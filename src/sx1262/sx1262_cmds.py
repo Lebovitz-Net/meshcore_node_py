@@ -27,11 +27,21 @@ class SX1262Cmds:
     # In sx1262_cmds.py (inside SX1262Cmds)
     OP_SET_DIO2_RF_SWITCH = 0x97
     OP_SET_DIO3_TCXO      = 0x9D
+    OP_GET_RX_BUFFER_STATUS = 0x13
+
+    def get_rx_buffer_status(self):
+        """
+        Get RX buffer status: payload length and start pointer.
+        Returns (payload_length, start_pointer).
+        """
+        resp = self._spi_cmd_read(self.OP_GET_RX_BUFFER_STATUS, [0x00], read_len=2)
+        payload_len = resp[0]
+        start_ptr   = resp[1]
+        return payload_len, start_ptr
 
     def set_dio2_rf_switch(self, enable: bool = True):
         # DIO2 as RF switch control (enable=1) or IRQ (enable=0)
         return self._spi_cmd(self.OP_SET_DIO2_RF_SWITCH, [0x00, 0x01 if enable else 0x00, 0x00, 0x00])
-
     def set_dio3_tcxo(self, voltage: int = 0x02, delay: int = 0x02, trim: int = 0x00):
         # Voltage code and delay code per Semtech mapping; trim/reserved usually 0x00
         return self._spi_cmd(self.OP_SET_DIO3_TCXO, [voltage, delay, trim])

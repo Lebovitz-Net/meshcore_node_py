@@ -40,8 +40,19 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         time.sleep(0.01)
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
-        self.get_status()
+        print("showing status", self.get_status())
         # Enter standby (RC oscillator)
+        irq = self.get_irq_status()
+        print("IRQ status:", hex(irq))
+
+        plen, ptr = self.get_rx_buffer_status()
+        print("Payload length:", plen, "Start pointer:", ptr)
+
+        data = self.read_buffer(ptr, plen)
+        print("Payload:", list(data))
+
+        self.clear_irq()
+
         self.set_standby()
 
         # Configure RF switch via DIO2 (no TXEN/RXEN on this board)
