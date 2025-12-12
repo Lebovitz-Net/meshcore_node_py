@@ -16,17 +16,17 @@ DIO1_PIN = 16   # DIO1 (IRQ: RX_DONE, TIMEOUT, CRC_ERR)
 
 class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
     def __init__(self, spi_bus=0, spi_dev=None, max_speed=500000, use_tcxo=True):
-        # If no device specified, probe automatically
+        # Probe SPI device if not specified
         if spi_dev is None:
             spi_dev = self.probe_spi_device(spi_bus)
             if spi_dev is None:
                 raise RuntimeError("No SX1262 found on CE0 or CE1")
 
+        # SPI setup
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, spi_dev)
         self.spi.max_speed_hz = max_speed
         self.spi.mode = 0
-
         print(f"SX1262 bound to /dev/spidev{spi_bus}.{spi_dev}")
 
         # GPIO setup
@@ -35,40 +35,31 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         GPIO.setup(BUSY_PIN, GPIO.IN)
         GPIO.setup(DIO1_PIN, GPIO.IN)
 
-        # Reset chip
+        # Hardware reset
         GPIO.output(RST_PIN, GPIO.LOW)
         time.sleep(0.01)
         GPIO.output(RST_PIN, GPIO.HIGH)
         time.sleep(0.01)
-        print("showing status", self.get_status())
+
+        # Confirm chip responds
+        status = self.get_status()
+        print("Initial status:", hex(status))
+
         # Enter standby (RC oscillator)
-        irq = self.get_irq_status()
-        print("IRQ status:", hex(irq))
-
-        plen, ptr = self.get_rx_buffer_status()
-        print("Payload length:", plen, "Start pointer:", ptr)
-
-        data = self.read_buffer(ptr, plen)
-        print("Payload:", list(data))
-
-        self.clear_irq()
-
         self.set_standby()
 
         # Configure RF switch via DIO2 (no TXEN/RXEN on this board)
-        # Enable DIO2 as RF switch control so the chip toggles the antenna path.
         self.set_dio2_rf_switch(True)
 
-        # Configure TCXO via DIO3 if present on the board
+        # Configure TCXO via DIO3 if present
         if use_tcxo:
-            # Voltage code 0x02 ~ 1.8V; delay code 0x02 ~ 2ms; trim 0x00
             self.set_dio3_tcxo(voltage=0x02, delay=0x02, trim=0x00)
 
-        # Map IRQs to DIO1
+        # Map IRQs to DIO1 and clear any stale flags
         self.set_dio_irq_params(rx_done=True, timeout=True, crc_err=True)
         self.clear_irq()
 
-        print("SX1262 initialized: standby, DIO2 RF switch, TCXO (optional), IRQs mapped.")
+        print("SX1262 initialized: standby, RF switch, TCXO (optional), IRQs mapped.")
 
     # -----------------------------
     # IRQ mapping
@@ -117,12 +108,11 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
     # -----------------------------
     # High-level receive example
     # -----------------------------
-
     def listen(self, freq_hz=868_000_000, sf=7, bw_hz=125_000, cr=5,
-               preamble_len=12, payload_len=64, sync_word=0x3444, timeout_ms=5000):
+            preamble_len=12, payload_len=64, sync_word=0x3444, timeout_ms=5000):
         """
         Configure LoRa and listen for packets.
-        Uses driver helpers for setup and IRQ polling.
+        Polls IRQ status via SPI instead of relying on DIO1.
         """
 
         # Configure radio
@@ -130,10 +120,10 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(preamble_len=preamble_len,
-                               explicit=True,
-                               payload_len=payload_len,
-                               crc_on=True,
-                               iq_inverted=False)
+                            explicit=True,
+                            payload_len=payload_len,
+                            crc_on=True,
+                            iq_inverted=False)
         self.set_sync_word(sync_word)
 
         # IRQ setup
@@ -147,8 +137,10 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
 
         try:
             while True:
-                if GPIO.input(DIO1_PIN) == 1:
-                    irq = self.get_irq_status()
+                # Poll IRQ status directly over SPI
+                irq = self.get_irq_status()
+
+                if irq:
                     self.clear_irq()
 
                     if irq & self.IRQ_RX_DONE:
@@ -175,10 +167,11 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
                         print("CRC error; re‑arming RX")
                         self.set_rx(timeout_ms)
 
-                time.sleep(0.001)
+                time.sleep(0.01)  # small polling delay
 
         except KeyboardInterrupt:
             print("Stopped listening")
+
 
     # -----------------------------
     # spi device probing
