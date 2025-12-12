@@ -50,8 +50,8 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         self.set_standby()
 
         # Configure RF switch (DIO2) and TCXO (DIO3: 1.8V, 2ms)
-        self._spi_cmd(self.OP_SET_DIO2_RF_SWITCH, [0x00, 0x01, 0x00, 0x00])
-        self._spi_cmd(self.OP_SET_DIO3_TCXO, [0x01, 0x02, 0x00])
+        self.set_dio2_rf_switch(True)
+        self.set_dio3_tcxo(voltage=0x02, delay=0x02)
 
         # Map IRQs to DIO1
         self.set_dio_irq_params(rx_done=True, timeout=True, crc_err=True)
