@@ -21,6 +21,7 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status):
         GPIO.setup(RST_PIN, GPIO.OUT)
         GPIO.setup(BUSY_PIN, GPIO.IN)
         GPIO.setup(DIO1_PIN, GPIO.IN)
+        GPIO.setup(23, GPIO.IN)
 
         # Setup SPI
         self.spi = spidev.SpiDev()
