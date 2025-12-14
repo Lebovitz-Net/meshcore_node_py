@@ -108,7 +108,7 @@ class SX1262:
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(8, True, 255, True)
-        self.set_sync_word(0x1424)
+        self.set_sync_word(0x3444)
 
         self.clear_irq()
         self.set_rx(0)  # continuous
