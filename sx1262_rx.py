@@ -120,10 +120,10 @@ class SX1262:
         return resp[0], resp[1]
 
     # --- Example listen loop ---
-    def listen(self, freq_hz=915_000_000, sf=7, bw_hz=125_000, cr=5,
-            preamble_len=8, payload_len=255, sync_word=0x3444):
+    def listen(self, freq_hz=915_000_000, sf=7, bw_hz=125_000, cr=5):
         """
         Continuous receive mode with automatic IRQ clearing and re‑arming.
+        Call with (freq_hz, sf, bw_hz, cr) just like before.
         """
 
         # Configure radio
@@ -131,15 +131,15 @@ class SX1262:
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(
-            preamble_len=preamble_len,
+            preamble_len=8,
             explicit=True,
-            payload_len=payload_len,
-            crc_on=True,          # ✅ enable CRC
+            payload_len=255,
+            crc_on=True,          # ✅ CRC enabled
             iq_inverted=False
         )
-        self.set_sync_word(sync_word)  # ✅ public sync word by default
+        self.set_sync_word(0x3444)  # ✅ public sync word
 
-        # Clear any stale IRQs
+        # Clear stale IRQs
         self.clear_irq()
 
         # Enter continuous RX (timeout=0)
@@ -151,7 +151,6 @@ class SX1262:
             while True:
                 irq = self.get_irq_status()
                 if irq:
-                    # Always clear IRQ flags
                     self.clear_irq()
 
                     if irq & self.IRQ_RX_DONE:
@@ -161,9 +160,7 @@ class SX1262:
                             print(f"RX_DONE: len={plen}, ptr={ptr}, payload={list(data)}")
                         else:
                             print("RX_DONE: empty packet")
-
-                        # Re‑arm continuous RX
-                        self.set_rx(0)
+                        self.set_rx(0)  # re‑arm continuous RX
 
                     elif irq & self.IRQ_CRC_ERR:
                         plen, ptr = self.get_rx_buffer_status()
@@ -178,10 +175,11 @@ class SX1262:
                         print("RX timeout, re‑arming RX")
                         self.set_rx(0)
 
-                time.sleep(0.05)  # small polling delay
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
             print("Stopped listening")
+
 
 if __name__ == "__main__":
     radio = SX1262()
