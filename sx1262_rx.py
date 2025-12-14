@@ -130,13 +130,7 @@ class SX1262:
         self.set_packet_type_lora()
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
-        self.set_packet_params(
-            preamble_len=8,
-            explicit=True,
-            payload_len=255,
-            crc_on=True,          # ✅ CRC enabled
-            iq_inverted=False
-        )
+        self.set_packet_params(8, True, 255, True, False)
         self.set_sync_word(0x3444)  # ✅ public sync word
 
         # Clear stale IRQs
