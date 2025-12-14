@@ -125,7 +125,6 @@ class SX1262(SX1262Buffer, SX1262Config, SX1262Mode, SX1262Status, SX1262Cmds):
         #                     crc_on=True,
         #                     iq_inverted=False)
         # self.set_sync_word(sync_word)
-        
         self.set_packet_params(
             preamble_len=8,
             explicit=True,
