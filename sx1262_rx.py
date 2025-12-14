@@ -75,7 +75,7 @@ class SX1262:
                0x00]  # IQ normal
         self.spi_cmd(buf)
 
-    def set_sync_word(self, sync=0x1424):  # MeshCore private
+    def set_sync_word(self, sync=0x3444):  # MeshCore private
         self.spi_cmd([0x0B, (sync >> 8) & 0xFF, sync & 0xFF])
 
     def clear_irq(self):
