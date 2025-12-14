@@ -2,15 +2,15 @@
 import spidev, RPi.GPIO as GPIO, time
 
 class SX1262:
-    # IRQ masks
-    IRQ_RX_DONE   = 0x0001
-    IRQ_TIMEOUT   = 0x0002
-    IRQ_CRC_ERR   = 0x0004
+    # Correct IRQ masks
+    IRQ_RX_DONE = 0x0002
+    IRQ_CRC_ERR = 0x0040
+    IRQ_TIMEOUT = 0x0200
 
-    def __init__(self, spi_bus=0, spi_dev=0, busy_pin=24, irq_pin=23, reset_pin=22):
+    def __init__(self, spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18):
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, spi_dev)
-        self.spi.max_speed_hz = 5000000
+        self.spi.max_speed_hz = 1000000   # safer for bring-up, raise later
         self.spi.mode = 0
 
         self.busy_pin = busy_pin
@@ -44,18 +44,20 @@ class SX1262:
         self.spi_cmd([0x8A, 0x01])  # SetPacketType LoRa
 
     def set_frequency(self, freq_hz):
-        frf = int((freq_hz << 25) / 32000000)
+        rfFreq = int(freq_hz * 33554432 / 32000000)
         buf = [0x86,
-               (frf >> 24) & 0xFF,
-               (frf >> 16) & 0xFF,
-               (frf >> 8) & 0xFF,
-               frf & 0xFF]
+               (rfFreq >> 24) & 0xFF,
+               (rfFreq >> 16) & 0xFF,
+               (rfFreq >> 8) & 0xFF,
+               rfFreq & 0xFF]
         self.spi_cmd(buf)
 
     def set_modulation_params(self, sf=7, bw_hz=125000, cr=5):
-        bw_map = {7800:0x00, 10400:0x08, 15600:0x01, 20800:0x09,
-                  31200:0x02, 41700:0x0A, 62500:0x03, 125000:0x04,
-                  250000:0x05, 500000:0x06}
+        bw_map = {
+            7800:0x00, 10400:0x08, 15600:0x01, 20800:0x09,
+            31250:0x02, 41700:0x0A, 62500:0x03, 125000:0x04,
+            250000:0x05, 500000:0x06
+        }
         bw_code = bw_map.get(bw_hz, 0x04)
         cr_code = {5:0x01, 6:0x02, 7:0x03, 8:0x04}.get(cr, 0x01)
         self.spi_cmd([0x8B, sf<<4, bw_code, cr_code, 0x00])
@@ -73,7 +75,7 @@ class SX1262:
                0x00]  # IQ normal
         self.spi_cmd(buf)
 
-    def set_sync_word(self, sync=0x3444):
+    def set_sync_word(self, sync=0x1424):  # MeshCore private
         self.spi_cmd([0x0B, (sync >> 8) & 0xFF, sync & 0xFF])
 
     def clear_irq(self):
@@ -95,7 +97,6 @@ class SX1262:
         return resp[3:3+length]
 
     def set_rx(self, timeout_ms=0):
-        # timeout=0 => continuous RX
         period = 0xFFFFFF if timeout_ms == 0 else int(timeout_ms/15.625)
         buf = [0x82,
                (period >> 16) & 0xFF,
@@ -103,12 +104,19 @@ class SX1262:
                period & 0xFF]
         self.spi_cmd(buf)
 
-    def listen(self, freq_hz=915000000, sf=7, bw_hz=125000, cr=5):
+    # Diagnostics
+    def get_rssi_snr(self):
+        resp = self.spi_cmd([0x15], 3)  # GetPacketStatus
+        rssi = -resp[1] / 2
+        snr = resp[2] / 4
+        return rssi, snr
+
+    def listen(self, freq_hz=910525000, sf=7, bw_hz=62500, cr=5):
         self.set_packet_type_lora()
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(8, True, 255, True)
-        self.set_sync_word(0x3444)
+        self.set_sync_word(0x1424)
 
         self.clear_irq()
         self.set_rx(0)  # continuous
@@ -124,25 +132,23 @@ class SX1262:
                         plen, ptr = self.get_rx_buffer_status()
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
-                            print(f"RX_DONE: len={plen}, ptr={ptr}, payload={list(data)}")
-                        else:
-                            print("RX_DONE: empty packet")
+                            rssi, snr = self.get_rssi_snr()
+                            print(f"RX_DONE: len={plen}, payload={list(data)}, RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
                         self.set_rx(0)
                     elif irq & self.IRQ_CRC_ERR:
                         plen, ptr = self.get_rx_buffer_status()
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
-                            print(f"CRC error, raw payload={list(data)}")
-                        else:
-                            print("CRC error, no payload")
+                            rssi, snr = self.get_rssi_snr()
+                            print(f"CRC error, raw payload={list(data)}, RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
                         self.set_rx(0)
                     elif irq & self.IRQ_TIMEOUT:
-                        # print("RX timeout, re‑arming RX")
+                        print("RX timeout, re‑arming RX")
                         self.set_rx(0)
                 time.sleep(0.05)
         except KeyboardInterrupt:
             print("Stopped listening")
 
 if __name__ == "__main__":
-    radio = SX1262(spi_bus=0, spi_dev=1, busy_pin=20, irq_pin=16, reset_pin=18)
+    radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18)
     radio.listen(910525000, 7, 62500, 5)
