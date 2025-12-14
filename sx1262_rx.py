@@ -137,7 +137,7 @@ class SX1262:
                             print("CRC error, no payload")
                         self.set_rx(0)
                     elif irq & self.IRQ_TIMEOUT:
-                        print("RX timeout, re‑arming RX")
+                        # print("RX timeout, re‑arming RX")
                         self.set_rx(0)
                 time.sleep(0.05)
         except KeyboardInterrupt:
