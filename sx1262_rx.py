@@ -144,5 +144,5 @@ class SX1262:
             print("Stopped listening")
 
 if __name__ == "__main__":
-    radio = SX1262()
+    radio = SX1262(0, 0, 20, 16, 18)
     radio.listen(910525000, 7, 62500, 5)
