@@ -120,34 +120,69 @@ class SX1262:
         return resp[0], resp[1]
 
     # --- Example listen loop ---
-    def listen(self, freq_hz=915_000_000, sf=7, bw_hz=125000, cr=5):
+    def listen(self, freq_hz=915_000_000, sf=7, bw_hz=125_000, cr=5,
+            preamble_len=8, payload_len=255, sync_word=0x3444):
+        """
+        Continuous receive mode with automatic IRQ clearing and re‑arming.
+        """
+
+        # Configure radio
         self.set_packet_type_lora()
         self.set_frequency(freq_hz)
-        self.set_modulation_params(sf, bw_hz, cr)
-        self.set_packet_params(preamble_len=8, payload_len=64, crc_on=True, explicit=True)
-        self.set_sync_word(0x3444)  # public sync word
+        self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
+        self.set_packet_params(
+            preamble_len=preamble_len,
+            explicit=True,
+            payload_len=payload_len,
+            crc_on=True,          # ✅ enable CRC
+            iq_inverted=False
+        )
+        self.set_sync_word(sync_word)  # ✅ public sync word by default
 
+        # Clear any stale IRQs
         self.clear_irq()
-        self.set_rx(0)  # continuous RX
 
-        print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz} Hz, CR 4/{cr}")
+        # Enter continuous RX (timeout=0)
+        self.set_rx(0)
+
+        print(f"Listening continuously on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz} Hz, CR 4/{cr}")
 
         try:
             while True:
                 irq = self.get_irq_status()
                 if irq:
+                    # Always clear IRQ flags
                     self.clear_irq()
+
                     if irq & self.IRQ_RX_DONE:
                         plen, ptr = self.get_rx_buffer_status()
-                        print(f"RX_DONE: length={plen}, ptr={ptr}")
+                        if plen > 0:
+                            data = self.read_buffer(ptr, plen)
+                            print(f"RX_DONE: len={plen}, ptr={ptr}, payload={list(data)}")
+                        else:
+                            print("RX_DONE: empty packet")
+
+                        # Re‑arm continuous RX
+                        self.set_rx(0)
+
                     elif irq & self.IRQ_CRC_ERR:
-                        print("CRC error")
+                        plen, ptr = self.get_rx_buffer_status()
+                        if plen > 0:
+                            data = self.read_buffer(ptr, plen)
+                            print(f"CRC error, raw payload={list(data)}")
+                        else:
+                            print("CRC error, no payload")
+                        self.set_rx(0)
+
                     elif irq & self.IRQ_TIMEOUT:
-                        print("RX timeout")
-                time.sleep(0.05)
+                        print("RX timeout, re‑arming RX")
+                        self.set_rx(0)
+
+                time.sleep(0.05)  # small polling delay
+
         except KeyboardInterrupt:
             print("Stopped listening")
 
 if __name__ == "__main__":
     radio = SX1262()
-    radio.listen()
+    radio.listen(910525000, 7, 62500, 5)
