@@ -121,22 +121,14 @@ class SX1262:
 
     # --- Example listen loop ---
     def listen(self, freq_hz=915_000_000, sf=7, bw_hz=125_000, cr=5):
-        """
-        Continuous receive mode with automatic IRQ clearing and re‑arming.
-        Call with (freq_hz, sf, bw_hz, cr) just like before.
-        """
-
-        # Configure radio
         self.set_packet_type_lora()
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
+        # Corrected call: only 4 args after preamble_len
         self.set_packet_params(8, True, 255, True)
-        self.set_sync_word(0x3444)  # ✅ public sync word
+        self.set_sync_word(0x3444)
 
-        # Clear stale IRQs
         self.clear_irq()
-
-        # Enter continuous RX (timeout=0)
         self.set_rx(0)
 
         print(f"Listening continuously on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz} Hz, CR 4/{cr}")
@@ -146,7 +138,6 @@ class SX1262:
                 irq = self.get_irq_status()
                 if irq:
                     self.clear_irq()
-
                     if irq & self.IRQ_RX_DONE:
                         plen, ptr = self.get_rx_buffer_status()
                         if plen > 0:
@@ -154,8 +145,7 @@ class SX1262:
                             print(f"RX_DONE: len={plen}, ptr={ptr}, payload={list(data)}")
                         else:
                             print("RX_DONE: empty packet")
-                        self.set_rx(0)  # re‑arm continuous RX
-
+                        self.set_rx(0)
                     elif irq & self.IRQ_CRC_ERR:
                         plen, ptr = self.get_rx_buffer_status()
                         if plen > 0:
@@ -164,16 +154,12 @@ class SX1262:
                         else:
                             print("CRC error, no payload")
                         self.set_rx(0)
-
                     elif irq & self.IRQ_TIMEOUT:
                         print("RX timeout, re‑arming RX")
                         self.set_rx(0)
-
                 time.sleep(0.05)
-
         except KeyboardInterrupt:
             print("Stopped listening")
-
 
 if __name__ == "__main__":
     radio = SX1262()
