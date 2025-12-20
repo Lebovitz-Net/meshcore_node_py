@@ -23,24 +23,33 @@ from sx1262.sx1262_constants import (
 )
 
 class SX1262:
-    def __init__(self, spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18):
-        self.spi = spidev.SpiDev()
-        self.spi.open(spi_bus, spi_dev)
-        self.spi.max_speed_hz = 1_000_000
-        self.spi.mode = 0
+    def __init__(self, spi_bus=0, spi_dev=0,
+                 busy_pin=20, irq_pin=16, reset_pin=18,
+                 nss_pin=21):   # <-- CS on GPIO21 (pin 40)
 
         self.busy_pin = busy_pin
         self.irq_pin = irq_pin
         self.reset_pin = reset_pin
+        self.nss_pin = nss_pin
 
+        # --- GPIO setup ---
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.busy_pin, GPIO.IN)
         GPIO.setup(self.irq_pin, GPIO.IN)
-        GPIO.setup(self.reset_pin, GPIO.OUT)
+        GPIO.setup(self.reset_pin, GPIO.OUT, initial=GPIO.HIGH)
+        GPIO.setup(self.nss_pin, GPIO.OUT, initial=GPIO.HIGH)  # manual CS
 
+        # --- SPI setup ---
+        self.spi = spidev.SpiDev()
+        self.spi.open(spi_bus, spi_dev)   # CE0/CE1 unused but harmless
+        self.spi.max_speed_hz = 1_000_000
+        self.spi.mode = 0
+
+        # --- Reset the radio ---
         self.reset()
         print("SX1262 reset")
 
+        # --- Run Semtech bring-up sequence ---
         self.base_init()
 
     # ---------- low-level ----------
@@ -61,22 +70,20 @@ class SX1262:
     #     return resp
 
     def spi_cmd(self, buf, read_len=0):
-        # Print the command being sent
-        print(f"SPI CMD → {buf}, read_len={read_len}")
-
-        # Wait for BUSY to clear
+        # Wait for BUSY to clear *before* selecting
         self._wait_busy()
 
-        # Perform the transfer
-        resp = self.spi.xfer2(buf + [0x00] * read_len)
+        # Assert CS (active low)
+        GPIO.output(self.nss_pin, GPIO.LOW)
 
-        # Read status byte immediately after
-        status = self.spi.xfer2([0xC0, 0x00])[1]
-
-        print(f"   RESP ← {resp}")
-        print(f"   STATUS = 0x{status:02X}")
+        try:
+            resp = self.spi.xfer2(buf + [0x00] * read_len)
+        finally:
+            # Deassert CS
+            GPIO.output(self.nss_pin, GPIO.HIGH)
 
         return resp
+
 
 
     # ---------- required init sequence ----------
