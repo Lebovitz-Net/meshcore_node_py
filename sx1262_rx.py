@@ -55,10 +55,29 @@ class SX1262:
         GPIO.output(self.reset_pin, GPIO.HIGH)
         time.sleep(0.01)
 
+    # def spi_cmd(self, buf, read_len=0):
+    #     self._wait_busy()
+    #     resp = self.spi.xfer2(buf + [0x00] * read_len)
+    #     return resp
+
     def spi_cmd(self, buf, read_len=0):
+        # Print the command being sent
+        print(f"SPI CMD → {buf}, read_len={read_len}")
+
+        # Wait for BUSY to clear
         self._wait_busy()
+
+        # Perform the transfer
         resp = self.spi.xfer2(buf + [0x00] * read_len)
+
+        # Read status byte immediately after
+        status = self.spi.xfer2([0xC0, 0x00])[1]
+
+        print(f"   RESP ← {resp}")
+        print(f"   STATUS = 0x{status:02X}")
+
         return resp
+
 
     # ---------- required init sequence ----------
 
