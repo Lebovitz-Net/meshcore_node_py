@@ -203,6 +203,8 @@ class SX1262:
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
         self.set_rx(0)
+        status = radio.spi_cmd([0xC0], 1)
+        print("Status:", hex(status[1]))
 
         print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz}, CR 4/{cr}")
         try:
