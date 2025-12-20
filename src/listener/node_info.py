@@ -91,8 +91,7 @@ class NodeInfo:
         sf   = reader.read_uint8()
         cr   = reader.read_uint8()
         # Forward to transport if supported
-        if hasattr(self.transport, "set_radio_params"):
-            self.transport.set_radio_params(freq, bw, sf, cr)
+        await self.set_radio_params(freq, bw, sf, cr)
         await self.send_ok_response()
 
     async def handle_set_tx_power(self, reader: BufferReader):
