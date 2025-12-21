@@ -284,7 +284,6 @@ class SX1262:
                             )
                         self.set_rx(0)
                     elif irq & IRQ_TIMEOUT:
-                        print("RX TIMEOUT, rearming")
                         self.set_rx(0)
                 time.sleep(0.05)
         except KeyboardInterrupt:
