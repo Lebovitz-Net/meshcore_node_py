@@ -294,22 +294,9 @@ class SX1262:
             lgpio.gpiochip_close(self.gpio_chip)
 
 
-# if __name__ == "__main__":
-#     radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
-#     radio.listen(
-#         freq_hz=910_525_000,
-#         sf=7,
-#         bw_hz=62_500,
-#         cr=5,
-#         preamble_len=8,
-#         sync_word=MESHTASTIC_SYNCWORD,
-#         crc_on=True,
-#         iq_inverted=False,
-#     )
 if __name__ == "__main__":
     radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
-
-    radio.configure_lora(
+    radio.listen(
         freq_hz=910_525_000,
         sf=7,
         bw_hz=62_500,
@@ -319,17 +306,30 @@ if __name__ == "__main__":
         crc_on=True,
         iq_inverted=False,
     )
+# if __name__ == "__main__":
+#     radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
 
-    print("Before SET_RX:")
-    s1 = radio.spi_cmd([0xC0], 1)
-    print("Status:", hex(s1[0]))
+#     radio.configure_lora(
+#         freq_hz=910_525_000,
+#         sf=7,
+#         bw_hz=62_500,
+#         cr=5,
+#         preamble_len=8,
+#         sync_word=MESHTASTIC_SYNCWORD,
+#         crc_on=True,
+#         iq_inverted=False,
+#     )
 
-    radio.set_rx(0)
+#     print("Before SET_RX:")
+#     s1 = radio.spi_cmd([0xC0], 1)
+#     print("Status:", hex(s1[0]))
 
-    print("After SET_RX:")
-    s2 = radio.spi_cmd([0xC0], 1)
-    print("Status:", hex(s2[0]))
-    print("BUSY:", radio._read_pin(radio.busy_pin))
-    print("DIO2:", radio._read_pin(radio.dio2_pin))
-    print("IRQ:", radio._read_pin(radio.irq_pin))
+#     radio.set_rx(0)
+
+#     print("After SET_RX:")
+#     s2 = radio.spi_cmd([0xC0], 1)
+#     print("Status:", hex(s2[0]))
+#     print("BUSY:", radio._read_pin(radio.busy_pin))
+#     print("DIO2:", radio._read_pin(radio.dio2_pin))
+#     print("IRQ:", radio._read_pin(radio.irq_pin))
 
