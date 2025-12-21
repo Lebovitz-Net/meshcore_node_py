@@ -247,7 +247,8 @@ class SX1262:
 
         # --- DEBUG: Check radio state after SET_RX ---
         status = self.spi_cmd([0xC0], 1)
-        print("Status after SET_RX:", hex(status[1]))
+        print("Status:", hex(status[0]))
+
         print("BUSY:", self._read_pin(self.busy_pin))
         print("DIO2:", self._read_pin(self.dio2_pin))
         print("IRQ:", self._read_pin(self.irq_pin))
@@ -321,14 +322,15 @@ if __name__ == "__main__":
     )
 
     print("Before SET_RX:")
-    s1 = radio.spi_cmd([0xC0], 1)
-    print("Status:", hex(s1[1]))
+    s1 = self.spi_cmd([0xC0], 1)
+    print("Status:", hex(s1[0]))
+
 
     radio.set_rx(0)
 
     print("After SET_RX:")
     s2 = radio.spi_cmd([0xC0], 1)
-    print("Status:", hex(s2[1]))
+    print("Status:", hex(s2[0]))
     print("BUSY:", radio._read_pin(radio.busy_pin))
     print("DIO2:", radio._read_pin(radio.dio2_pin))
     print("IRQ:", radio._read_pin(radio.irq_pin))
