@@ -257,9 +257,11 @@ class SX1262:
         try:
             while True:
                 resp = self.spi_cmd([GET_IRQ_STATUS], 3)
-                print("GET_IRQ_STATUS raw:", resp)
                 irq = (resp[1] << 8) | resp[2]
-                print("irq mask:", hex(irq))
+
+                if irq != 0:
+                    print("IRQ:", hex(irq))
+
 
                 if irq:
                     self.clear_irq()
