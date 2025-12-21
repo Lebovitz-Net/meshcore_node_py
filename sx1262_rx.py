@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import time
 import spidev
-import RPi.GPIO as GPIO
+import lgpio
 
 from sx1262.sx1262_constants import (
     # commands
@@ -22,6 +22,7 @@ from sx1262.sx1262_constants import (
     RX_BASE_DEFAULT, TX_BASE_DEFAULT,
 )
 
+
 class SX1262:
     def __init__(self, spi_bus=0, spi_dev=0,
                  busy_pin=20, irq_pin=16, reset_pin=18,
@@ -31,13 +32,23 @@ class SX1262:
         self.irq_pin = irq_pin
         self.reset_pin = reset_pin
         self.nss_pin = nss_pin
+        self.dio2_pin = 26
 
-        # --- GPIO setup ---
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.busy_pin, GPIO.IN)
-        GPIO.setup(self.irq_pin, GPIO.IN)
-        GPIO.setup(self.reset_pin, GPIO.OUT, initial=GPIO.HIGH)
-        GPIO.setup(self.nss_pin, GPIO.OUT, initial=GPIO.HIGH)  # manual CS
+
+
+        # --- GPIO setup via lgpio ---
+        # Use gpiochip0 (main Pi GPIO controller)
+        self.gpio_chip = lgpio.gpiochip_open(0)
+
+        # Claim pins
+        # BUSY and IRQ are inputs
+        lgpio.gpio_claim_input(self.gpio_chip, self.busy_pin)
+        lgpio.gpio_claim_input(self.gpio_chip, self.irq_pin)
+
+        # RESET and NSS are outputs, default high
+        lgpio.gpio_claim_output(self.gpio_chip, self.reset_pin, 1)
+        lgpio.gpio_claim_output(self.gpio_chip, self.nss_pin, 1)
+        lgpio.gpio_claim_output(self.gpio_chip, self.dio2_pin)
 
         # --- SPI setup ---
         self.spi = spidev.SpiDev()
@@ -54,37 +65,41 @@ class SX1262:
 
     # ---------- low-level ----------
 
-    def _wait_busy(self):
-        while GPIO.input(self.busy_pin):
-            time.sleep(0.001)
+    def _read_pin(self, pin):
+        return lgpio.gpio_read(self.gpio_chip, pin)
+
+    def _write_pin(self, pin, value):
+        lgpio.gpio_write(self.gpio_chip, pin, 1 if value else 0)
+
+def _wait_busy(self):
+    for _ in range(5000):  # 5 seconds max
+        if not self._read_pin(self.busy_pin):
+            return
+        time.sleep(0.001)
+    raise RuntimeError("BUSY stuck high — check wiring")
+
 
     def reset(self):
-        GPIO.output(self.reset_pin, GPIO.LOW)
+        # Drive RESET low briefly, then high
+        self._write_pin(self.reset_pin, 0)
         time.sleep(0.01)
-        GPIO.output(self.reset_pin, GPIO.HIGH)
+        self._write_pin(self.reset_pin, 1)
         time.sleep(0.01)
-
-    # def spi_cmd(self, buf, read_len=0):
-    #     self._wait_busy()
-    #     resp = self.spi.xfer2(buf + [0x00] * read_len)
-    #     return resp
 
     def spi_cmd(self, buf, read_len=0):
         # Wait for BUSY to clear *before* selecting
         self._wait_busy()
 
         # Assert CS (active low)
-        GPIO.output(self.nss_pin, GPIO.LOW)
+        self._write_pin(self.nss_pin, 0)
 
         try:
             resp = self.spi.xfer2(buf + [0x00] * read_len)
         finally:
             # Deassert CS
-            GPIO.output(self.nss_pin, GPIO.HIGH)
+            self._write_pin(self.nss_pin, 1)
 
         return resp
-
-
 
     # ---------- required init sequence ----------
 
@@ -229,8 +244,11 @@ class SX1262:
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
         self.set_rx(0)
-        status = radio.spi_cmd([0xC0], 1)
-        print("Status:", hex(status[1]))
+        print("DIO2 state:", self._read_pin(self.dio2_pin))
+
+        # Read status (0xC0 = GET_STATUS)
+        status = self.spi_cmd([0xC0], 1)
+        print("Status:", hex(status[1]) if len(status) > 1 else status)
 
         print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz}, CR 4/{cr}")
         try:
@@ -243,16 +261,20 @@ class SX1262:
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
                             rssi, snr = self.get_rssi_snr()
-                            print(f"RX_DONE len={plen}, payload={list(data)}, "
-                                  f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
+                            print(
+                                f"RX_DONE len={plen}, payload={list(data)}, "
+                                f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB"
+                            )
                         self.set_rx(0)
                     elif irq & IRQ_CRC_ERR:
                         plen, ptr = self.get_rx_buffer_status()
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
                             rssi, snr = self.get_rssi_snr()
-                            print(f"CRC_ERR len={plen}, raw={list(data)}, "
-                                  f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
+                            print(
+                                f"CRC_ERR len={plen}, raw={list(data)}, "
+                                f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB"
+                            )
                         self.set_rx(0)
                     elif irq & IRQ_TIMEOUT:
                         print("RX TIMEOUT, rearming")
@@ -261,12 +283,13 @@ class SX1262:
         except KeyboardInterrupt:
             print("Stopped listening")
         finally:
+            # Clean up SPI and GPIO
             self.spi.close()
-            GPIO.cleanup()
+            lgpio.gpiochip_close(self.gpio_chip)
 
 
 if __name__ == "__main__":
-    radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18)
+    radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
     radio.listen(
         freq_hz=910_525_000,
         sf=7,
