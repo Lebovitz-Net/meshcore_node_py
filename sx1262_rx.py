@@ -244,9 +244,11 @@ class SX1262:
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
         self.set_rx(0)
-        print("DIO2 state after rx:", self._read_pin(self.dio2_pin))
-        status = self.spi_cmd([0xC0], 1)
-        print("Status after SET_RX:", hex(status[1]) if len(status) > 1 else status)
+
+        print("Status after SET_RX:", hex(status[1]))
+        print("DIO2:", self._read_pin(self.dio2_pin))
+        print("IRQ:", self._read_pin(self.irq_pin))
+
 
         # Read status (0xC0 = GET_STATUS)
         status = self.spi_cmd([0xC0], 1)
