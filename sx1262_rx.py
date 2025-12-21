@@ -257,8 +257,7 @@ class SX1262:
         try:
             while True:
                 resp = self.spi_cmd([GET_IRQ_STATUS], 3)
-                irq = (resp[1] << 8) | resp[2]
-
+                irq = resp[2]   # ONLY the low byte contains IRQ flags
                 if irq != 0:
                     print("IRQ:", hex(irq))
 
