@@ -244,12 +244,15 @@ class SX1262:
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
         self.set_rx(0)
+
+        # --- DEBUG: Check radio state after SET_RX ---
         status = self.spi_cmd([0xC0], 1)
-        print("Status after SET_RX:", hex(status[1]) if len(status) > 1 else status)
+        print("Status after SET_RX:", hex(status[1]))
+        print("BUSY:", self._read_pin(self.busy_pin))
         print("DIO2:", self._read_pin(self.dio2_pin))
         print("IRQ:", self._read_pin(self.irq_pin))
-        print("Status:", hex(status[1]) if len(status) > 1 else status)
-        print(f"Listening on {freq_hz/1e6:.3f} MHz, SF{sf}, BW {bw_hz}, CR 4/{cr}")
+# ---------------------------------------------
+
         try:
             while True:
                 irq = self.get_irq_status()
