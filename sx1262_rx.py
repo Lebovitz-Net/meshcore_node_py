@@ -71,12 +71,12 @@ class SX1262:
     def _write_pin(self, pin, value):
         lgpio.gpio_write(self.gpio_chip, pin, 1 if value else 0)
 
-def _wait_busy(self):
-    for _ in range(5000):  # 5 seconds max
-        if not self._read_pin(self.busy_pin):
-            return
-        time.sleep(0.001)
-    raise RuntimeError("BUSY stuck high — check wiring")
+    def _wait_busy(self):
+        for _ in range(5000):  # 5 seconds max
+            if not self._read_pin(self.busy_pin):
+                return
+            time.sleep(0.001)
+        raise RuntimeError("BUSY stuck high — check wiring")
 
 
     def reset(self):
