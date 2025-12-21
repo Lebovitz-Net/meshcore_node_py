@@ -322,9 +322,8 @@ if __name__ == "__main__":
     )
 
     print("Before SET_RX:")
-    s1 = self.spi_cmd([0xC0], 1)
+    s1 = radio.spi_cmd([0xC0], 1)
     print("Status:", hex(s1[0]))
-
 
     radio.set_rx(0)
 
