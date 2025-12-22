@@ -259,6 +259,7 @@ class SX1262:
     def configure_lora(self, freq_hz, sf, bw_hz, cr,
                        preamble_len, sync_word,
                        crc_on=True, iq_inverted=False):
+        print(f"configure lora freq {freq_hz} bw {bw_hz} sf {sf} cr {cr} sync {sync_word}")
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(preamble_len=preamble_len,
@@ -280,9 +281,6 @@ class SX1262:
         # --- DEBUG: Check radio state after SET_RX ---
         status = self.spi_cmd([0xC0], 1)
         print("Status:", hex(status[0]))
-
-        print("BUSY:", self._read_pin(self.busy_pin))
-        print("IRQ:", self._read_pin(self.irq_pin))
 
         try:
             while True:
