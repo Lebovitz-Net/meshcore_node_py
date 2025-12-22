@@ -259,7 +259,7 @@ class SX1262:
     def configure_lora(self, freq_hz, sf, bw_hz, cr,
                        preamble_len, sync_word,
                        crc_on=True, iq_inverted=False):
-        print(f"configure lora freq {freq_hz} bw {bw_hz} sf {sf} cr {cr} sync {sync_word}")
+        print(f"configure lora freq {freq_hz} bw {bw_hz} sf {sf} cr {cr} sync {hex(sync_word)}")
         self.set_frequency(freq_hz)
         self.set_modulation_params(sf=sf, bw_hz=bw_hz, cr=cr)
         self.set_packet_params(preamble_len=preamble_len,
