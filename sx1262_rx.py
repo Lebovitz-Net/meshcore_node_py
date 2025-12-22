@@ -147,7 +147,8 @@ class SX1262:
         # Your constants RX_BASE_DEFAULT / TX_BASE_DEFAULT are already defined:
         #   TX_BASE_DEFAULT = 0x00
         #   RX_BASE_DEFAULT = 0x00 (or whatever you use)
-        self.spi_cmd([SET_BUFFER_BASE_ADDRESS, TX_BASE_DEFAULT, RX_BASE_DEFAULT])
+        self.spi_cmd([SET_BUFFER_BASE_ADDRESS, RX_BASE_DEFAULT, TX_BASE_DEFAULT])
+
 
         # 5) DIO2 as RF switch (chip-side RF switch control)
         self.spi_cmd([SET_DIO2_RF_SWITCH_CTRL, 0x01])
