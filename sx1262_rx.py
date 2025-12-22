@@ -22,7 +22,8 @@ from sx1262.sx1262_constants import (
     MESHTASTIC_SYNCWORD,
     RX_BASE_DEFAULT, TX_BASE_DEFAULT,
 )
-
+    # SX1262 command for instantaneous RSSI (from datasheet)
+GET_RSSI_INST = 0x15  # add this to your constants if not present
 
 class SX1262:
     def __init__(self, spi_bus=0, spi_dev=0,
@@ -65,9 +66,6 @@ class SX1262:
         self.start_rssi_monitor(interval = 5)
 
     # ---------- low-level ----------
-
-    # SX1262 command for instantaneous RSSI (from datasheet)
-    GET_RSSI_INST = 0x15  # add this to your constants if not present
 
     def get_rssi_inst(self):
         """
