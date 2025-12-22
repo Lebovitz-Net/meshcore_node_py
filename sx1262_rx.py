@@ -304,6 +304,8 @@ class SX1262:
     def listen(self, freq_hz=910_525_000, sf=7, bw_hz=62_500, cr=5,
                preamble_len=8, sync_word=MESHTASTIC_SYNCWORD,
                crc_on=True, iq_inverted=False):
+        ptype = self.spi_cmd([GET_PACKET_TYPE], 1)
+        print("Packet type:", hex(ptype[1]))
 
         self.configure_lora(freq_hz, sf, bw_hz, cr,
                             preamble_len, sync_word,
