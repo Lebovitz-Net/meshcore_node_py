@@ -122,7 +122,14 @@ class SX1262:
         self._wait_busy()
 
         # Assert CS (active low)
+        print("NSS before:", self._read_pin(self.nss_pin))
         self._write_pin(self.nss_pin, 0)
+        print("NSS after:", self._read_pin(self.nss_pin))
+        resp = self.spi.xfer2(buf + [0x00] * read_len)
+        self._write_pin(self.nss_pin, 1)
+        print("NSS final:", self._read_pin(self.nss_pin))
+
+        
 
         try:
             resp = self.spi.xfer2(buf + [0x00] * read_len)
