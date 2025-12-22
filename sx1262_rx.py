@@ -55,6 +55,7 @@ class SX1262:
         # --- SPI setup ---
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, spi_dev)   # CE0/CE1 unused but harmless
+        self.spi.no_cs = True
         self.spi.max_speed_hz = 1_000_000
         self.spi.mode = 0
 
