@@ -308,6 +308,8 @@ class SX1262:
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
         self.set_rx(0)  # continuous RX
+        status = self.spi_cmd([0xC0], 1) 
+        print("Status:", hex(status[0]))
 
         # --- DEBUG: Check radio state after SET_RX ---
         status = self.spi_cmd([0xC0], 1)
@@ -348,8 +350,6 @@ class SX1262:
                                 f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB"
                             )
                         self.set_rx(0)
-                        status = self.spi_cmd([0xC0], 1) 
-                        print("Status:", hex(status[0]))
 
                     elif irq & IRQ_TIMEOUT:
                         print("IRQ_TIMEOUT")
