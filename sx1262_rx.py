@@ -32,7 +32,7 @@ class SX1262:
         self.irq_pin = irq_pin
         self.reset_pin = reset_pin
         self.nss_pin = nss_pin
-        self.dio2_pin = 26  # RF switch control line on your board
+        # self.dio2_pin = 26  # RF switch control line on your board
 
         # --- GPIO setup via lgpio ---
         # Use gpiochip0 (main Pi GPIO controller)
@@ -45,8 +45,9 @@ class SX1262:
         # RESET and NSS are outputs, default high
         lgpio.gpio_claim_output(self.gpio_chip, self.reset_pin, 1)
         lgpio.gpio_claim_output(self.gpio_chip, self.nss_pin, 1)
+        # removed DIO2 setup, as it's not used by the board
         # DIO2 as a controllable GPIO for RF switch (if needed)
-        lgpio.gpio_claim_output(self.gpio_chip, self.dio2_pin, 0)
+        # lgpio.gpio_claim_output(self.gpio_chip, self.dio2_pin, 0)
 
         # --- SPI setup ---
         self.spi = spidev.SpiDev()
@@ -281,7 +282,6 @@ class SX1262:
         print("Status:", hex(status[0]))
 
         print("BUSY:", self._read_pin(self.busy_pin))
-        print("DIO2:", self._read_pin(self.dio2_pin))
         print("IRQ:", self._read_pin(self.irq_pin))
 
         try:
