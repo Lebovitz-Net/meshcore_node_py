@@ -24,6 +24,7 @@ from sx1262.sx1262_constants import (
 )
     # SX1262 command for instantaneous RSSI (from datasheet)
 GET_RSSI_INST = 0x15  # add this to your constants if not present
+GET_PACKET_TYPE = 0x11
 
 class SX1262:
     def __init__(self, spi_bus=0, spi_dev=0,
