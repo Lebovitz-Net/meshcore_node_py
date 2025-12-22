@@ -66,18 +66,35 @@ class SX1262:
 
     # ---------- low-level ----------
 
+    # SX1262 command for instantaneous RSSI (from datasheet)
+    GET_RSSI_INST = 0x15  # add this to your constants if not present
+
+    def get_rssi_inst(self):
+        """
+        Instantaneous RSSI while in RX mode.
+        Returns RSSI in dBm.
+        """
+        resp = self.spi_cmd([GET_RSSI_INST], 1)
+        # resp[0] = status, resp[1] = rssi (but we asked for 1 extra byte,
+        # so total len == 2; status is first, rssi is second)
+        rssi_raw = resp[1]
+        rssi_dbm = -rssi_raw / 2.0
+        return rssi_dbm
+
+
     def start_rssi_monitor(self, interval=5):
         def loop():
             while True:
                 try:
-                    rssi, snr = self.get_rssi_snr()
-                    print(f"[RSSI Monitor] RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
+                    rssi = self.get_rssi_inst()
+                    print(f"[RSSI Monitor] InstRSSI={rssi:.1f} dBm")
                 except Exception as e:
                     print("RSSI monitor error:", e)
                 time.sleep(interval)
 
         t = threading.Thread(target=loop, daemon=True)
         t.start()
+
 
 
     def _read_pin(self, pin):
