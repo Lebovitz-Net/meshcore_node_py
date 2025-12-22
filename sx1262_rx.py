@@ -2,6 +2,7 @@
 import time
 import spidev
 import lgpio
+import threading
 
 from sx1262.sx1262_constants import (
     # commands
@@ -61,8 +62,23 @@ class SX1262:
 
         # --- Run Semtech bring-up sequence ---
         self.base_init()
+        self.start_rssi_monitor(interval = 5)
 
     # ---------- low-level ----------
+
+    def start_rssi_monitor(self, interval=5):
+        def loop():
+            while True:
+                try:
+                    rssi, snr = self.get_rssi_snr()
+                    print(f"[RSSI Monitor] RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB")
+                except Exception as e:
+                    print("RSSI monitor error:", e)
+                time.sleep(interval)
+
+        t = threading.Thread(target=loop, daemon=True)
+        t.start()
+
 
     def _read_pin(self, pin):
         return lgpio.gpio_read(self.gpio_chip, pin)
