@@ -26,21 +26,18 @@ from sx1262.sx1262_constants import (
 class SX1262:
     def __init__(self, spi_bus=0, spi_dev=0,
                  busy_pin=20, irq_pin=16, reset_pin=18,
-                 nss_pin=21):   # <-- CS on GPIO21 (pin 40)
+                 nss_pin=21):   # CS on GPIO21 (pin 40, as traced)
 
         self.busy_pin = busy_pin
         self.irq_pin = irq_pin
         self.reset_pin = reset_pin
         self.nss_pin = nss_pin
-        self.dio2_pin = 26
-
-
+        self.dio2_pin = 26  # RF switch control line on your board
 
         # --- GPIO setup via lgpio ---
         # Use gpiochip0 (main Pi GPIO controller)
         self.gpio_chip = lgpio.gpiochip_open(0)
 
-        # Claim pins
         # BUSY and IRQ are inputs
         lgpio.gpio_claim_input(self.gpio_chip, self.busy_pin)
         lgpio.gpio_claim_input(self.gpio_chip, self.irq_pin)
@@ -48,7 +45,8 @@ class SX1262:
         # RESET and NSS are outputs, default high
         lgpio.gpio_claim_output(self.gpio_chip, self.reset_pin, 1)
         lgpio.gpio_claim_output(self.gpio_chip, self.nss_pin, 1)
-        lgpio.gpio_claim_output(self.gpio_chip, self.dio2_pin)
+        # DIO2 as a controllable GPIO for RF switch (if needed)
+        lgpio.gpio_claim_output(self.gpio_chip, self.dio2_pin, 0)
 
         # --- SPI setup ---
         self.spi = spidev.SpiDev()
@@ -72,12 +70,11 @@ class SX1262:
         lgpio.gpio_write(self.gpio_chip, pin, 1 if value else 0)
 
     def _wait_busy(self):
-        for _ in range(5000):  # 5 seconds max
+        for _ in range(5000):  # ~5 seconds max
             if not self._read_pin(self.busy_pin):
                 return
             time.sleep(0.001)
-        raise RuntimeError("BUSY stuck high — check wiring")
-
+        raise RuntimeError("BUSY stuck high — check wiring and power")
 
     def reset(self):
         # Drive RESET low briefly, then high
@@ -106,14 +103,23 @@ class SX1262:
     def base_init(self):
         # 1) Standby RC
         self.spi_cmd([SET_STANDBY, STDBY_RC])
+
         # 2) Regulator mode LDO
         self.spi_cmd([SET_REGULATOR_MODE, REG_MODE_LDO])
+
         # 3) Packet type LoRa
         self.spi_cmd([SET_PACKET_TYPE, PACKET_TYPE_LORA])
+
         # 4) Buffer base addresses
-        self.spi_cmd([SET_BUFFER_BASE_ADDRESS, RX_BASE_DEFAULT, TX_BASE_DEFAULT])
-        # 5) DIO2 as RF switch
+        # Semtech order is: TX base, then RX base.
+        # Your constants RX_BASE_DEFAULT / TX_BASE_DEFAULT are already defined:
+        #   TX_BASE_DEFAULT = 0x00
+        #   RX_BASE_DEFAULT = 0x00 (or whatever you use)
+        self.spi_cmd([SET_BUFFER_BASE_ADDRESS, TX_BASE_DEFAULT, RX_BASE_DEFAULT])
+
+        # 5) DIO2 as RF switch (chip-side RF switch control)
         self.spi_cmd([SET_DIO2_RF_SWITCH_CTRL, 0x01])
+
         # 6) DIO IRQ params (RX_DONE, CRC_ERR, TIMEOUT -> DIO1)
         irq_mask = IRQ_RX_DONE | IRQ_CRC_ERR | IRQ_TIMEOUT
         self.spi_cmd([
@@ -128,6 +134,7 @@ class SX1262:
     # ---------- LoRa config ----------
 
     def set_frequency(self, freq_hz):
+        # Same calc as Waveshare: freq * 2^25 / 32e6
         frf = int(freq_hz * (1 << 25) / 32_000_000)
         self.spi_cmd([
             SET_RF_FREQUENCY,
@@ -138,18 +145,27 @@ class SX1262:
         ])
 
     def set_modulation_params(self, sf=7, bw_hz=62_500, cr=5):
+        # Map Hz to chip BW code; fall back to 125 kHz if unknown.
         bw_map = {
             7_800: 0x00, 10_400: 0x08, 15_600: 0x01, 20_800: 0x09,
             31_250: 0x02, 41_700: 0x0A, 62_500: 0x03, 125_000: 0x04,
             250_000: 0x05, 500_000: 0x06,
         }
         bw_code = bw_map.get(bw_hz, LORA_BW_125_KHZ)
+
+        # CR codes – use your constants when possible
         cr_map = {5: LORA_CR_4_5, 6: 0x02, 7: 0x03, 8: 0x04}
         cr_code = cr_map.get(cr, LORA_CR_4_5)
-        ldro = 0x00  # leave off for now
+
+        # LDRO OFF for now; you can add auto-LDRO later
+        ldro = 0x00
+
+        # SF goes into upper nibble according to datasheet
+        sf_field = (sf << 4) & 0xF0
+
         self.spi_cmd([
             SET_MODULATION_PARAMS,
-            (sf << 4) & 0xF0,
+            sf_field,
             bw_code & 0x1F,
             cr_code & 0x07,
             ldro,
@@ -185,8 +201,11 @@ class SX1262:
         ])
 
     def get_irq_status(self):
+        # 3 bytes: status, IRQ high, IRQ low.
         resp = self.spi_cmd([GET_IRQ_STATUS], 3)
-        return (resp[1] << 8) | resp[2]
+        # If you *ever* want the full 16-bit mask:
+        # return (resp[1] << 8) | resp[2]
+        return resp
 
     def get_rx_buffer_status(self):
         resp = self.spi_cmd([GET_RX_BUFFER_STATUS], 3)
@@ -195,10 +214,21 @@ class SX1262:
         return plen, ptr
 
     def read_buffer(self, offset, length):
-        # For simplicity, use READ_BUFFER with dummy + read_len
+        """
+        READ_BUFFER (0x1E) expects:
+          TX: [opcode, offset, 0x00, 0, 0, ..., 0]
+          RX: [status, dummy, payload...]
+        So:
+          - send 1 dummy byte before payload
+          - ask for length+1 dummy/payload bytes
+          - discard status + dummy, return exactly 'length' bytes
+        """
         cmd = [READ_BUFFER, offset & 0xFF, 0x00]
-        resp = self.spi_cmd(cmd, read_len=length)
-        return resp[3:] if len(resp) > 3 else []
+        resp = self.spi_cmd(cmd, read_len=length + 1)
+        # resp[0] = status, resp[1] = ?, resp[2] = first payload byte?
+        # Using the same pattern as other commands where data starts at resp[1],
+        # but here we have opcode + address bytes shifting things, so we skip 3.
+        return resp[3:3 + length]
 
     def set_rx(self, timeout_ms=0):
         if timeout_ms == 0:
@@ -240,10 +270,11 @@ class SX1262:
     def listen(self, freq_hz=910_525_000, sf=7, bw_hz=62_500, cr=5,
                preamble_len=8, sync_word=MESHTASTIC_SYNCWORD,
                crc_on=True, iq_inverted=False):
+
         self.configure_lora(freq_hz, sf, bw_hz, cr,
                             preamble_len, sync_word,
                             crc_on, iq_inverted)
-        self.set_rx(0)
+        self.set_rx(0)  # continuous RX
 
         # --- DEBUG: Check radio state after SET_RX ---
         status = self.spi_cmd([0xC0], 1)
@@ -252,20 +283,21 @@ class SX1262:
         print("BUSY:", self._read_pin(self.busy_pin))
         print("DIO2:", self._read_pin(self.dio2_pin))
         print("IRQ:", self._read_pin(self.irq_pin))
-# ---------------------------------------------
 
         try:
             while True:
-                resp = self.spi_cmd([GET_IRQ_STATUS], 3)
-                irq = resp[2]   # ONLY the low byte contains IRQ flags
-                if irq != 0:
-                    print("IRQ:", hex(irq))
-
-
+                resp = self.get_irq_status()
+                # Only low byte contains the IRQ bits we care about
+                irq = resp[2]
                 if irq:
+                    print(f"Raw IRQ word: 0x{((resp[1] << 8) | resp[2]):04x}")
+                    print("IRQ low byte:", hex(irq))
+
                     self.clear_irq()
+
                     if irq & IRQ_RX_DONE:
                         plen, ptr = self.get_rx_buffer_status()
+                        print(f"RX_DONE: plen={plen}, ptr={ptr}")
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
                             rssi, snr = self.get_rssi_snr()
@@ -273,9 +305,12 @@ class SX1262:
                                 f"RX_DONE len={plen}, payload={list(data)}, "
                                 f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB"
                             )
+                        # Re-enter RX
                         self.set_rx(0)
+
                     elif irq & IRQ_CRC_ERR:
                         plen, ptr = self.get_rx_buffer_status()
+                        print(f"CRC_ERR: plen={plen}, ptr={ptr}")
                         if plen > 0:
                             data = self.read_buffer(ptr, plen)
                             rssi, snr = self.get_rssi_snr()
@@ -284,8 +319,11 @@ class SX1262:
                                 f"RSSI={rssi:.1f} dBm, SNR={snr:.1f} dB"
                             )
                         self.set_rx(0)
+
                     elif irq & IRQ_TIMEOUT:
+                        print("IRQ_TIMEOUT")
                         self.set_rx(0)
+
                 time.sleep(0.05)
         except KeyboardInterrupt:
             print("Stopped listening")
@@ -296,7 +334,16 @@ class SX1262:
 
 
 if __name__ == "__main__":
-    radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
+    # Use the GPIO mapping you traced on your board
+    radio = SX1262(
+        spi_bus=0,
+        spi_dev=0,
+        busy_pin=20,
+        irq_pin=16,
+        reset_pin=18,
+        nss_pin=21,
+    )
+
     radio.listen(
         freq_hz=910_525_000,
         sf=7,
@@ -307,30 +354,3 @@ if __name__ == "__main__":
         crc_on=True,
         iq_inverted=False,
     )
-# if __name__ == "__main__":
-#     radio = SX1262(spi_bus=0, spi_dev=0, busy_pin=20, irq_pin=16, reset_pin=18, nss_pin=21)
-
-#     radio.configure_lora(
-#         freq_hz=910_525_000,
-#         sf=7,
-#         bw_hz=62_500,
-#         cr=5,
-#         preamble_len=8,
-#         sync_word=MESHTASTIC_SYNCWORD,
-#         crc_on=True,
-#         iq_inverted=False,
-#     )
-
-#     print("Before SET_RX:")
-#     s1 = radio.spi_cmd([0xC0], 1)
-#     print("Status:", hex(s1[0]))
-
-#     radio.set_rx(0)
-
-#     print("After SET_RX:")
-#     s2 = radio.spi_cmd([0xC0], 1)
-#     print("Status:", hex(s2[0]))
-#     print("BUSY:", radio._read_pin(radio.busy_pin))
-#     print("DIO2:", radio._read_pin(radio.dio2_pin))
-#     print("IRQ:", radio._read_pin(radio.irq_pin))
-
