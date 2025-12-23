@@ -103,7 +103,7 @@ class SX1262:
     def _write_pin(self, pin, value):
         lgpio.gpio_write(self.gpio_chip, pin, 1 if value else 0)
 
-    def wait_busy(self):
+    def _wait_busy(self):
         t0 = time.time()
         while self._read_pin(self.busy_pin) == 1:
             print("BUSY=1")
