@@ -187,19 +187,19 @@ class SX1262:
             250_000: 0x05, 500_000: 0x06,
         }
         bw_code = bw_map.get(bw_hz, 0x04)
+
         cr_map = {5: 0x01, 6: 0x02, 7: 0x03, 8: 0x04}
         cr_code = cr_map.get(cr, 0x01)
 
-        sf_field = (sf << 4) & 0xF0
-        ldro = 0x00
+        sf_code = sf  # direct mapping
 
         self.spi_cmd([
             SET_MODULATION_PARAMS,
-            sf_field,
-            bw_code & 0x1F,
-            cr_code & 0x07,
-            ldro,
+            sf_code,
+            bw_code,
+            cr_code
         ])
+
 
     def set_packet_params(self, preamble_len=8, payload_len=255,
                           crc_on=True, iq_inverted=False):
