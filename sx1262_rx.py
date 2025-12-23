@@ -103,12 +103,17 @@ class SX1262:
     def _write_pin(self, pin, value):
         lgpio.gpio_write(self.gpio_chip, pin, 1 if value else 0)
 
-    def _wait_busy(self):
-        for _ in range(5000):  # ~5 seconds max
-            if not self._read_pin(self.busy_pin):
-                return
-            time.sleep(0.001)
-        raise RuntimeError("BUSY stuck high — check wiring and power")
+    def wait_busy(self):
+        t0 = time.time()
+        while self._read_pin(self.busy_pin) == 1:
+            print("BUSY=1")
+            time.sleep(0.01)
+            if time.time() - t0 > 1.0:
+                print("ERROR: BUSY stuck high")
+                return False
+        print("BUSY=0")
+        return True
+
 
     def reset(self):
         # Drive RESET low briefly, then high
@@ -119,12 +124,7 @@ class SX1262:
 
     def spi_cmd(self, buf, read_len=0):
         # Wait for BUSY to clear *before* selecting
-        # DEBUG: slow visible toggle for meter/logic probe
-        self._write_pin(self.nss_pin, 0)
-        time.sleep(0.2)
-        self._write_pin(self.nss_pin, 1)
-        time.sleep(0.2)
-
+        
         self._wait_busy()
 
         # Assert CS (active low)
